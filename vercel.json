@@ -1,16 +1,12 @@
 {
   "version": 2,
   "builds": [
-    { 
-      "src": "package.json", 
-      "use": "@vercel/next" 
-    },
-    { 
-      "src": "api/**/*.py", 
-      "use": "@vercel/python", 
-      "config": { 
-        "runtime": "python3.12" 
-      } 
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
     }
-  ]
+  ],
+  "regions": ["iad1"],
+  "cleanUrls": true,
+  "trailingSlash": false
 }
