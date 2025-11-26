@@ -1,4 +1,0 @@
-requests
-python-telegram-bot==20.6
-httpx
-python-dotenv
