@@ -6,7 +6,6 @@
       "use": "@vercel/next"
     }
   ],
-  "regions": ["iad1"],
   "cleanUrls": true,
   "trailingSlash": false
 }
