@@ -1,13 +1,13 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "AI Mini App",
-  description: "Telegram + Web AI App"
+  title: "Neon Glow AI",
+  description: "Твой личный AI-компаньон с душой",
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="ru">
       <body>{children}</body>
     </html>
   );
