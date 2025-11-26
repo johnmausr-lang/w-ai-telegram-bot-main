@@ -1,17 +1,17 @@
 # image_analyze.py
 import os
+import json
 import base64
 import httpx
 from dotenv import load_dotenv
+from http.server import BaseHTTPRequestHandler
 
 load_dotenv()
-
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-async def analyze_image(file_path: str, prompt: str = "Опиши изображение"):
+def analyze_image(file_data_b64: str, prompt: str = "Опиши изображение"):
     """
     Анализ картинки GPT-моделью.
-    Возвращает текст.
     """
 
     url = "https://api.openai.com/v1/chat/completions"
@@ -21,26 +21,49 @@ async def analyze_image(file_path: str, prompt: str = "Опиши изображ
         "Content-Type": "application/json"
     }
 
-    with open(file_path, "rb") as f:
-        img_base64 = base64.b64encode(f.read()).decode()
-
+    # ФИКС: Используем правильную структуру для Vision API
     payload = {
         "model": "gpt-4o-mini",
         "messages": [
             {
                 "role": "user",
                 "content": [
-                    {"type": "input_text", "text": prompt},
+                    {"type": "text", "text": prompt},
                     {
-                        "type": "input_image",
-                        "image_url": f"data:image/png;base64,{img_base64}"
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{file_data_b64}"
+                        }
                     }
                 ]
             }
         ]
     }
 
-    async with httpx.AsyncClient(timeout=200) as client:
-        resp = await client.post(url, json=payload)
+    with httpx.Client(timeout=200) as client:
+        resp = client.post(url, json=payload, headers=headers)
         resp.raise_for_status()
         return resp.json()["choices"][0]["message"]["content"]
+
+class handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        length = int(self.headers['Content-Length'])
+        body = json.loads(self.rfile.read(length))
+        
+        file_data_b64 = body.get("file_data_b64", "")
+        prompt = body.get("prompt", "Опиши изображение")
+
+        try:
+            if not file_data_b64:
+                raise ValueError("Missing file_data_b64 in request body.")
+
+            analysis_text = analyze_image(file_data_b64, prompt)
+            response = {"text": analysis_text}
+            self.send_response(200)
+        except Exception as e:
+            response = {"error": f"Image Analysis Error: {str(e)}"}
+            self.send_response(500)
+
+        self.send_header("Content-type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps(response).encode())
