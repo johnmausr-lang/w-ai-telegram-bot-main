@@ -1,37 +1,37 @@
-# tts.py
-import httpx
-import base64
+# api/tts.py
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
+import json
+import base64
+import httpx
+from http.server import BaseHTTPRequestHandler
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-async def text_to_speech(text: str, voice: str = "alloy"):
-    """
-    Генерация аудио из текста.
-    Возвращает raw MP3 bytes.
-    """
+class handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        try:
+            length = int(self.headers['Content-Length'])
+            body = json.loads(self.rfile.read(length).decode())
+            text = body.get("text", "")
+            voice = body.get("voice", "alloy")
 
-    url = "https://api.openai.com/v1/audio/speech"
+            with httpx.Client(timeout=60) as client:
+                resp = client.post(
+                    "https://api.openai.com/v1/audio/speech",
+                    json={"model": "tts-1", "voice": voice, "input": text},
+                    headers={"Authorization": f"Bearer {OPENAI_API_KEY}"}
+                )
+                resp.raise_for_status()
 
-    headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/json"
-    }
+            audio_b64 = base64.b64encode(resp.content).decode()
 
-    payload = {
-        "model": "gpt-4o-mini-tts",
-        "voice": voice,
-        "input": text
-    }
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"isUrl": False, "data": audio_b64}).encode())
 
-    async with httpx.AsyncClient(timeout=100) as client:
-        resp = await client.post(url, json=payload)
-        resp.raise_for_status()
-
-        audio_base64 = resp.json()["audio"]
-        audio_bytes = base64.b64decode(audio_base64)
-
-        return audio_bytes
+        except Exception as e:
+            self.send_response(500)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": str(e)}).encode())
