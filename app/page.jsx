@@ -92,7 +92,7 @@ export default function NeonGlowAI() {
         body: JSON.stringify({ message: userMsg, personality }),
       });
       const data = await res.json();
-      const reply = data.reply || "❤️";
+      const reply = data.reply || "I love you";
       setMessages(m => [...m, { role: "assistant", content: reply }]);
       speak(reply);
     } catch (e) {
@@ -186,7 +186,7 @@ export default function NeonGlowAI() {
                 {/* ОРИЕНТАЦИЯ */}
                 {personality.gender && !personality.orientation && (
                   <div className="flex flex-wrap justify-center gap-6">
-                    {["Гетеро",", "Би", "Гей/Лесби", "Мне всё равно"].map(o => (
+                    {["Гетеро", "Би", "Гей/Лесби", "Мне всё равно"].map(o => (
                       <motion.button key={o} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
                         onClick={() => setPersonality(p => ({ ...p, orientation: o }))}
                         className="px-12 py-6 rounded-full bg-white/10 backdrop-blur border-2 border-white/30 hover:border-pink-400 z-50 text-xl">
