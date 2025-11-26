@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .slider::-webkit-slider-thumb {
+    @apply appearance-none w-8 h-8 bg-white rounded-full shadow-lg cursor-pointer;
+  }
+}
+
 body {
-  @apply bg-slate-100 text-slate-900;
+  @apply bg-black text-white antialiased;
 }
