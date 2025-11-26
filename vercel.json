@@ -1,18 +1,16 @@
 {
   "version": 2,
   "builds": [
-    {
-      "src": "api/**/*.py",
-      "use": "@vercel/python",
+    { 
+      "src": "package.json", 
+      "use": "@vercel/next" 
+    },
+    { 
+      "src": "api/**/*.py", 
+      "use": "@vercel/python", 
       "config": { 
         "runtime": "python3.12" 
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/chat.py"
+      } 
     }
   ]
 }
