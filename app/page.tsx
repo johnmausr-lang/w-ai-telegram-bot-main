@@ -1,352 +1,317 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { FiSend, FiVolume2, FiMic, FiCamera } from "react-icons/fi"; // Иконки
+import React, { useState, useRef } from "react";
 
-// -------------------------
-// Типы (должны совпадать с app/setup/page.tsx)
-// -------------------------
-interface AiSettings {
-    gender: 'male' | 'female' | 'neutral';
-    orientation: 'hetero' | 'bi' | 'gay_lesbian' | 'universal';
-    style: 'chat' | 'flirt';
-    intensity: number;
-    timestamp: number;
-}
+// Вспомогательная функция для преобразования File объекта в Base64 строку
+const fileToBase64 = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+        // Извлекаем только Base64 строку (удаляем префикс "data:image/jpeg;base64,")
+        const base64String = reader.result as string;
+        resolve(base64String.split(',')[1]);
+    };
+    reader.onerror = error => reject(error);
+});
 
+// Основной компонент страницы
 export default function Page() {
-    const router = useRouter();
-    
-    // --- Состояние настроек и перенаправление ---
-    const [isSetupComplete, setIsSetupComplete] = useState(false);
-    const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
+  const [prompt, setPrompt] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
 
-    // Проверка настроек при загрузке
-    useEffect(() => {
-        const storedSettings = localStorage.getItem("aiSettings");
-        if (storedSettings) {
-            const settings = JSON.parse(storedSettings) as AiSettings;
-            setAiSettings(settings);
-            setIsSetupComplete(true);
-        } else {
-            // 1. Если настроек нет, перенаправляем на страницу настройки
-            router.replace("/setup");
-        }
-    }, [router]);
+  const [ttsLoading, setTtsLoading] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
-    // --- Core Functionality States (Ваши старые состояния) ---
-    const [prompt, setPrompt] = useState("");
-    const [imageUrl, setImageUrl] = useState<string | null>(null);
-    const [imageLoading, setImageLoading] = useState(false);
+  const [sttLoading, setSttLoading] = useState(false);
+  const [sttResult, setSttResult] = useState<string | null>(null);
 
-    const [ttsLoading, setTtsLoading] = useState(false);
-    const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [analyzeLoading, setAnalyzeLoading] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<string | null>(null);
 
-    const [sttLoading, setSttLoading] = useState(false);
-    const [sttResult, setSttResult] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const audioInputRef = useRef<HTMLInputElement | null>(null);
 
-    const [analyzeLoading, setAnalyzeLoading] = useState(false);
-    const [analysisResult, setAnalysisResult] = useState<string | null>(null);
+  // ====== 1. Generate Image (Генерация) ======
+  const handleGenerateImage = async () => {
+    if (!prompt.trim()) return alert("Введите prompt для генерации изображения");
 
-    const fileInputRef = useRef<HTMLInputElement | null>(null);
-    const audioInputRef = useRef<HTMLInputElement | null>(null);
-    const imageAnalyzeRef = useRef<HTMLInputElement | null>(null);
-    
-    // --- Условные стили на основе настроек ---
-    const isFlirty = aiSettings?.style === 'flirt';
-    const accentColor = isFlirty ? 'pink-500' : 'blue-500';
-    const accentShadow = isFlirty ? 'shadow-[0_0_15px_rgba(255,105,180,0.8)]' : 'shadow-[0_0_15px_rgba(59,130,246,0.8)]';
-    const inputGlow = isFlirty ? 'focus:ring-pink-500 focus:border-pink-500' : 'focus:ring-blue-500 focus:border-blue-500';
+    setImageLoading(true);
+    setImageUrl(null);
 
-    if (!isSetupComplete || !aiSettings) {
-        // Заглушка при ожидании или перенаправлении
-        return (
-            <div className="flex justify-center items-center h-screen" 
-                 style={{ background: 'linear-gradient(135deg, #1A0033 0%, #4C00FF 100%)' }}>
-                <div className="text-white text-xl animate-pulse">
-                    Загрузка... Проверка настроек AI...
-                </div>
-            </div>
-        );
+    try {
+      const resp = await fetch("/api/image_generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+
+      // --- ОБРАБОТКА ОШИБОК ---
+      if (!resp.ok) {
+        const err = await resp.text();
+        alert(`Ошибка генерации изображения: ${resp.status} - ${err}`);
+        setImageLoading(false);
+        return;
+      }
+      // -------------------------
+
+      const data = await resp.json();
+      // Получаем Base64 и создаем Data URL для отображения
+      setImageUrl(`data:image/png;base64,${data.data}`);
+
+    } catch (error) {
+      alert(`Непредвиденная ошибка при генерации: ${error.message}`);
+    } finally {
+      setImageLoading(false);
     }
+  };
+
+
+  // ====== 2. Text-to-Speech (TTS) ======
+  const handleTts = async () => {
+    if (!sttResult?.trim()) return alert("Сначала выполните STT или введите текст.");
+
+    setTtsLoading(true);
+    setAudioUrl(null);
+
+    try {
+      const resp = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: sttResult }),
+      });
+
+      // --- ОБРАБОТКА ОШИБОК ---
+      if (!resp.ok) {
+        const err = await resp.text();
+        alert(`Ошибка TTS: ${resp.status} - ${err}`);
+        setTtsLoading(false);
+        return;
+      }
+      // -------------------------
+
+      const data = await resp.json();
+      // Получаем Base64 и создаем Data URL для тега <audio>
+      setAudioUrl(`data:audio/mp3;base64,${data.data}`);
+
+    } catch (error) {
+      alert(`Непредвиденная ошибка при TTS: ${error.message}`);
+    } finally {
+      setTtsLoading(false);
+    }
+  };
+
+
+  // ====== 3. Speech-to-Text (STT) ======
+  const handleStt = async () => {
+    if (!audioInputRef.current?.files?.length) return alert("Выберите аудиофайл для распознавания.");
     
-    // ----------------------------------------------
-    // --- Обработчики API (Скорректировано для Fast API) ---
-    // ----------------------------------------------
+    const audioFile = audioInputRef.current.files[0];
 
-    // 1. Generate Image
-    const handleGenerateImage = async () => {
-        if (!prompt.trim()) return alert("Введите prompt для генерации изображения");
+    setSttLoading(true);
+    setSttResult(null);
 
-        setImageLoading(true);
-        setImageUrl(null);
-        try {
-            const finalPrompt = `Generate a cinematic image for a ${aiSettings.style} companion (Gender: ${aiSettings.gender}, Orientation: ${aiSettings.orientation}, Intensity: ${aiSettings.intensity}). Subject: ${prompt}`;
-            
-            const resp = await fetch("/api/image_generate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt: finalPrompt }),
-            });
-
-            if (!resp.ok) {
-                const errorData = await resp.json();
-                throw new Error(errorData.detail || "Ошибка генерации изображения");
-            }
-
-            const data = await resp.json();
-            
-            // API должен вернуть { isUrl: true, data: '...' }
-            if (data.isUrl && data.data) {
-                setImageUrl(data.data);
-            } else {
-                alert("API вернул неверный формат URL.");
-            }
-        } catch (error: any) {
-            alert(`Ошибка: ${error.message}`);
-        } finally {
-            setImageLoading(false);
-        }
-    };
-
-    // 2. Text to Speech (TTS)
-    const handleTextToSpeech = async () => {
-        if (!sttResult || !sttResult.trim()) return alert("Сначала распознайте речь (STT).");
-
-        setTtsLoading(true);
-        setAudioUrl(null);
-        try {
-            const resp = await fetch("/api/tts", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: sttResult }),
-            });
-
-            if (!resp.ok) {
-                throw new Error("Ошибка TTS: API вернул не 200");
-            }
-
-            const audioBlob = await resp.blob();
-            const url = URL.createObjectURL(audioBlob);
-            setAudioUrl(url);
-
-        } catch (error: any) {
-            alert(`Ошибка: ${error.message}`);
-        } finally {
-            setTtsLoading(false);
-        }
-    };
-
-    // 3. Speech to Text (STT)
-    const handleSpeechToText = async () => {
-        if (!audioInputRef.current?.files?.length) return alert("Выберите аудиофайл");
-
-        setSttLoading(true);
-        setSttResult(null);
-        const formData = new FormData();
-        formData.append("file", audioInputRef.current.files[0]);
-
-        try {
-            const resp = await fetch("/api/stt", {
-                method: "POST",
-                body: formData,
-            });
-
-            if (!resp.ok) {
-                const errorData = await resp.json();
-                throw new Error(errorData.detail || "Ошибка STT");
-            }
-
-            const data = await resp.json();
-            setSttResult(data.text);
-        } catch (error: any) {
-            alert(`Ошибка STT: ${error.message}`);
-        } finally {
-            setSttLoading(false);
-        }
-    };
-    
-    // 4. Image Analysis
-    const handleAnalyzeImage = async () => {
-        if (!imageAnalyzeRef.current?.files?.length) return alert("Выберите файл изображения для анализа");
-
-        setAnalyzeLoading(true);
-        setAnalysisResult(null);
+    try {
+        const file_data_b64 = await fileToBase64(audioFile); // Читаем файл в Base64
         
-        const formData = new FormData();
-        formData.append("file", imageAnalyzeRef.current.files[0]);
-        formData.append("prompt", `Analyze this image in the style of a ${aiSettings.style} companion (Intensity: ${aiSettings.intensity}%). Describe it in detail.`);
+        const resp = await fetch("/api/stt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ file_data_b64 }), // Отправляем Base64
+        });
 
-        try {
-            const resp = await fetch("/api/image_analyze", {
-                method: "POST",
-                body: formData,
-            });
-
-            if (!resp.ok) {
-                const errorData = await resp.json();
-                throw new Error(errorData.detail || "Ошибка анализа изображения");
-            }
-
-            const data = await resp.json();
-            setAnalysisResult(data.description);
-        } catch (error: any) {
-            alert(`Ошибка: ${error.message}`);
-        } finally {
-            setAnalyzeLoading(false);
+        // --- ОБРАБОТКА ОШИБОК ---
+        if (!resp.ok) {
+            const err = await resp.text();
+            alert(`Ошибка STT: ${resp.status} - ${err}`);
+            setSttLoading(false);
+            return;
         }
-    };
+        // -------------------------
+        
+        const data = await resp.json();
+        setSttResult(data.text); 
+
+    } catch (error) {
+        alert(`Непредвиденная ошибка при STT: ${error.message}`);
+    } finally {
+        setSttLoading(false);
+    }
+  };
 
 
-    // ----------------------------------------------
-    // --- JSX (Интерфейс) ---
-    // ----------------------------------------------
+  // ====== 4. Analyze Image (Анализ) ======
+  const handleAnalyzeImage = async () => {
+    if (!fileInputRef.current?.files?.length) return alert("Выберите изображение для анализа.");
 
-    return (
-        <div className="min-h-screen p-6 text-white" 
-             style={{ background: 'linear-gradient(135deg, #1A0033 0%, #4C00FF 100%)' }}>
-            <style jsx global>{`
-                /* Анимация парения для заголовка */
-                @keyframes float {
-                    0% { transform: translateY(0px); }
-                    50% { transform: translateY(-2px); }
-                    100% { transform: translateY(0px); }
-                }
-            `}</style>
-            <header className="text-center mb-10">
-                <h1 className={`text-4xl font-extrabold mb-2 drop-shadow-lg text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-blue-400 ${accentShadow}`} style={{animation: 'float 2s ease-in-out infinite'}}>
-                    Neon Glow AI Chat
-                </h1>
-                <p className="text-lg text-white/80">
-                    AI-Компаньон ({aiSettings.gender}, {aiSettings.orientation}) в режиме: 
-                    <span className={`font-bold ml-1 text-${accentColor}`}>{aiSettings.style.toUpperCase()}</span> (Интенсивность: {aiSettings.intensity}%)
-                    <button onClick={() => router.push("/setup")} className="ml-3 text-sm text-yellow-400 hover:underline">
-                        (Изменить)
-                    </button>
-                </p>
-            </header>
+    const imageFile = fileInputRef.current.files[0];
 
-            {/* General Chat / Main Input Section */}
-            <section className="max-w-xl mx-auto mb-10 p-6 rounded-2xl border border-white/10 bg-white/10 backdrop-blur-sm shadow-2xl">
-                <h2 className="text-2xl font-semibold mb-4 text-center">Главный Чат</h2>
-                
-                {/* Input Field */}
-                <div className="flex space-x-3">
-                    <input
-                        type="text"
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        placeholder={isFlirty ? "Что ты хочешь обсудить, дорогой/дорогая? 😉" : "Задайте вопрос AI-ассистенту..."}
-                        className={`w-full p-3 rounded-xl border border-white/20 bg-black/30 text-white placeholder-gray-400 transition-all ${inputGlow}`}
-                    />
-                    <button
-                        onClick={() => alert(`Вызов /api/chat с контекстом: ${aiSettings.style}`)} // Здесь будет логика CHAT
-                        className={`p-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 transition-all ${accentShadow}`}
-                    >
-                        <FiSend size={24} />
-                    </button>
-                </div>
-            </section>
+    setAnalyzeLoading(true);
+    setAnalysisResult(null);
 
-            {/* Image Generation */}
-            <section className="max-w-xl mx-auto mb-10 p-6 rounded-2xl border border-white/10 bg-white/10 backdrop-blur-sm shadow-2xl">
-                <h2 className="text-xl font-semibold mb-4 text-pink-400 flex items-center">
-                    <FiCamera className="mr-2" /> Генерация Изображений
-                </h2>
+    try {
+        const file_data_b64 = await fileToBase64(imageFile); // Читаем файл в Base64
 
-                <div className="flex space-x-3">
-                    <input
-                        type="text"
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        placeholder="Опишите, что должен нарисовать AI..."
-                        className={`w-full p-3 rounded-xl border border-white/20 bg-black/30 text-white placeholder-gray-400 transition-all ${inputGlow}`}
-                    />
-                    <button
-                        onClick={handleGenerateImage}
-                        disabled={imageLoading}
-                        className={`p-3 rounded-xl bg-gradient-to-r from-pink-500 to-red-500 hover:from-pink-600 hover:to-red-600 transition-all ${imageLoading ? 'opacity-50' : ''}`}
-                    >
-                        {imageLoading ? '...' : 'Создать'}
-                    </button>
-                </div>
+        const resp = await fetch("/api/image_analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                file_data_b64, // Отправляем Base64
+                prompt: "Опиши это изображение, найди смешные детали и дай короткий комментарий от лица профессионального фотографа." // Расширенный промпт
+            }),
+        });
+        
+        // --- ОБРАБОТКА ОШИБОК ---
+        if (!resp.ok) {
+            const err = await resp.text();
+            alert(`Ошибка анализа: ${resp.status} - ${err}`);
+            setAnalyzeLoading(false);
+            return;
+        }
+        // -------------------------
 
-                <div className="mt-5 text-center">
-                    {imageLoading && <div className="animate-pulse text-yellow-400">Генерация... подождите</div>}
-                    {imageUrl && (
-                        <div className="mt-3 inline-block p-2 border border-white/20 rounded-lg">
-                            <img src={imageUrl} alt="Generated AI Image" className="max-w-full h-auto rounded-lg" style={{ maxHeight: '300px' }} />
-                        </div>
-                    )}
-                </div>
-            </section>
+        const data = await resp.json();
+        setAnalysisResult(data.text);
+        
+    } catch (error) {
+        alert(`Непредвиденная ошибка при анализе: ${error.message}`);
+    } finally {
+        setAnalyzeLoading(false);
+    }
+  };
 
-            {/* STT and TTS */}
-            <section className="max-w-xl mx-auto mb-10 grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Speech to Text (STT) */}
-                <div className="p-6 rounded-2xl border border-white/10 bg-white/10 backdrop-blur-sm shadow-2xl">
-                    <h2 className="text-xl font-semibold mb-4 text-blue-300 flex items-center">
-                        <FiMic className="mr-2" /> Голос в Текст
-                    </h2>
-                    <input type="file" ref={audioInputRef} accept="audio/*" className="w-full text-sm text-white/80 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-500/50 file:text-white" />
-                    <button
-                        onClick={handleSpeechToText}
-                        disabled={sttLoading}
-                        className="w-full mt-3 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 transition-all"
-                    >
-                        {sttLoading ? 'Распознавание...' : 'Распознать Голос'}
-                    </button>
-                    {sttResult && <div className="mt-3 p-3 bg-white/20 rounded text-sm whitespace-pre-wrap">{sttResult}</div>}
-                </div>
 
-                {/* Text to Speech (TTS) */}
-                <div className="p-6 rounded-2xl border border-white/10 bg-white/10 backdrop-blur-sm shadow-2xl">
-                    <h2 className="text-xl font-semibold mb-4 text-purple-400 flex items-center">
-                        <FiVolume2 className="mr-2" /> Текст в Голос
-                    </h2>
-                    <p className="text-sm text-white/70 mb-3">На основе распознанного текста.</p>
-                    <button
-                        onClick={handleTextToSpeech}
-                        disabled={ttsLoading || !sttResult}
-                        className="w-full py-2 rounded-xl bg-purple-500 hover:bg-purple-600 transition-all"
-                    >
-                        {ttsLoading ? 'Генерация Аудио...' : 'Сгенерировать Голос'}
-                    </button>
-                    {audioUrl && (
-                        <div className="mt-3">
-                            <audio controls src={audioUrl} className="w-full"></audio>
-                        </div>
-                    )}
-                </div>
-            </section>
-            
-            {/* Image Analysis */}
-            <section className="max-w-xl mx-auto mb-10 p-6 rounded-2xl border border-white/10 bg-white/10 backdrop-blur-sm shadow-2xl">
-                <h2 className="text-xl font-semibold mb-4 text-yellow-400 flex items-center">
-                    <FiCamera className="mr-2" /> Анализ Изображений
-                </h2>
-                
-                <input type="file" ref={imageAnalyzeRef} accept="image/*" className="w-full text-sm text-white/80 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-500/50 file:text-white" />
-                
-                <button
-                    onClick={handleAnalyzeImage}
-                    disabled={analyzeLoading}
-                    className="w-full mt-3 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-600 transition-all"
-                >
-                    {analyzeLoading ? 'Анализ...' : 'Анализировать Изображение'}
-                </button>
+  return (
+    <main className="min-h-screen p-5">
+      <h1 className="text-3xl font-bold text-center mb-8">
+        AI Mini App Demo
+      </h1>
 
-                <div className="mt-5">
-                    {analysisResult && (
-                        <div className="p-3 bg-white/20 rounded">
-                            <strong>AI Описание:</strong>
-                            <div className="mt-2 whitespace-pre-wrap text-sm">{analysisResult}</div>
-                        </div>
-                    )}
-                </div>
-            </section>
+      <section className="max-w-xl w-full mx-auto p-4 bg-white shadow-lg rounded-lg mb-8">
+        <h2 className="text-xl font-semibold mb-3">
+          1. Генерация изображения (DALL-E 3)
+        </h2>
+        
+        <textarea
+          className="w-full p-2 border border-slate-300 rounded resize-none mb-3 focus:ring-purple-500 focus:border-purple-500"
+          rows={3}
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="Введите подробный запрос для генерации изображения..."
+          disabled={imageLoading}
+        />
+        
+        <button
+          className="w-full bg-purple-600 text-white py-2 rounded hover:bg-purple-700 disabled:bg-purple-300 transition"
+          onClick={handleGenerateImage}
+          disabled={imageLoading || !prompt.trim()}
+        >
+          {imageLoading ? "Генерация..." : "Сгенерировать изображение"}
+        </button>
+
+        {/* Image result */}
+        <div className="mt-5 text-center">
+          {imageUrl && (
+            <img 
+              src={imageUrl} 
+              alt="Сгенерированное изображение" 
+              className="w-full max-h-96 object-contain rounded border border-slate-200"
+            />
+          )}
         </div>
-    );
+      </section>
+      
+      
+      {/* 2. STT и TTS */}
+      <section className="max-w-xl w-full mx-auto p-4 bg-white shadow-lg rounded-lg mb-8">
+        <h2 className="text-xl font-semibold mb-3">
+          2. Голос: Распознавание (STT) и Синтез (TTS)
+        </h2>
+        
+        <div className="space-y-4">
+            {/* STT */}
+            <div className="border p-3 rounded">
+                <p className="font-medium mb-2">Распознавание речи (STT):</p>
+                <input 
+                    type="file" 
+                    accept="audio/*" 
+                    ref={audioInputRef} 
+                    className="w-full text-sm mb-2"
+                />
+                <button
+                    className="w-full bg-blue-500 text-white py-1 rounded hover:bg-blue-600 disabled:bg-blue-300 transition"
+                    onClick={handleStt}
+                    disabled={sttLoading}
+                >
+                    {sttLoading ? "Распознавание..." : "Распознать речь"}
+                </button>
+                {sttResult && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded text-sm whitespace-pre-wrap">
+                        **Текст:** {sttResult}
+                    </div>
+                )}
+            </div>
+
+            {/* TTS */}
+            <div className="border p-3 rounded">
+                <p className="font-medium mb-2">Синтез речи (TTS):</p>
+                <p className="text-sm text-slate-600 mb-2">На основе распознанного текста.</p>
+                <button
+                    className="w-full bg-green-500 text-white py-1 rounded hover:bg-green-600 disabled:bg-green-300 transition"
+                    onClick={handleTts}
+                    disabled={ttsLoading || !sttResult}
+                >
+                    {ttsLoading ? "Синтез..." : "Синтезировать голос"}
+                </button>
+                {audioUrl && (
+                    <audio controls src={audioUrl} className="w-full mt-2"></audio>
+                )}
+            </div>
+        </div>
+      </section>
+
+
+      {/* 3. Analyze Image */}
+      <section className="max-w-xl w-full mx-auto p-4 bg-white shadow-lg rounded-lg mb-8">
+        <h2 className="text-xl font-semibold mb-3">
+          3. Анализ изображения (GPT Vision)
+        </h2>
+
+        <input 
+          type="file" 
+          accept="image/*" 
+          ref={fileInputRef} 
+          className="w-full text-sm mb-3"
+        />
+
+        <button
+          className="w-full bg-red-500 text-white py-2 rounded hover:bg-red-600 disabled:bg-red-300 transition"
+          onClick={handleAnalyzeImage}
+          disabled={analyzeLoading}
+        >
+          {analyzeLoading ? "Анализ..." : "Проанализировать изображение"}
+        </button>
+
+        {/* Analysis result */}
+        <div className="mt-5">
+          {analysisResult && (
+            <div className="p-3 bg-red-50 rounded">
+              <strong>Анализ изображения:</strong>
+              <div className="mt-2 whitespace-pre-wrap">{analysisResult}</div>
+            </div>
+          )}
+        </div>
+      </section>
+      
+      {/* Инструкция - Оставим для информации, удалив ненужный старый текст */}
+      <section className="max-w-3xl w-full mx-auto text-sm text-slate-600">
+        <h2 className="font-medium mb-2">Инструкция (Обновлено)</h2>
+        <ol className="list-decimal pl-5 space-y-1">
+          <li>Бэкенд-функции теперь настроены на Vercel (благодаря `vercel.json`).</li>
+          <li>Фронтенд отправляет файлы как **Base64**-строки (чтобы они дошли до Vercel).</li>
+          <li>Для работы всех функций требуется **`OPENAI_API_KEY`** в переменных окружения Vercel.</li>
+        </ol>
+      </section>
+    </main>
+  );
 }
