@@ -1,15 +1,9 @@
+// app/page.jsx
 "use client";
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Heart, MessageCircle, Camera, Mic, Square } from "lucide-react";
-
-// --- КОНСТАНТЫ ---
-// Начальное сообщение от AI при первом запуске
-const INITIAL_MESSAGE = {
-  role: "assistant",
-  content: "Привет, киберстранник! Готова к новым приключениям? Сначала давай настроим мой интерфейс. Выбери себе спутника:",
-};
-
+import { Sparkles, Heart, MessageCircle, Camera, Mic, MicOff } from "lucide-react";
 
 export default function NeonGlowAI() {
   const [step, setStep] = useState("welcome");
@@ -22,437 +16,229 @@ export default function NeonGlowAI() {
     testDone: false,
     nsfw: false,
   });
-  const [messages, setMessages] = useState([INITIAL_MESSAGE]); // Добавили начальное сообщение
+
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [generatingPhoto, setGeneratingPhoto] = useState(false);
-  const [isRecording, setIsRecording] = useState(false); // Состояние записи
-  
-  const audioRef = useRef(null);
+  const [isRecording, setIsRecording] = useState(false);
   const messagesEndRef = useRef(null);
-  // Рефы для записи
+  const audioRef = useRef(null);
   const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
 
-
+  // Автоскролл к последнему сообщению
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
     scrollToBottom();
+  }, [messages, loading, generatingPhoto]);
+
+  useEffect(() => {
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
-      window.Telegram.WebApp.MainButton.hide();
     }
-  }, [messages, step]);
+  }, []);
 
-  // Голосовой ответ (TTS) с использованием локального API
+  // Голосовой ответ (TTS)
   const speak = useCallback(async (text) => {
     if (!text) return;
-    // ИЗМЕНЕНО: Передаем GENDER для выбора голоса
-    const gender = personality.gender; 
+    const voice = personality.gender === "Мужчина"
+      ? "echo"
+      : personality.nsfw ? "shimmer" : "nova";
 
     try {
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, gender }),
+        body: JSON.stringify({ text, voice }),
       });
-      
-      if (!res.ok) throw new Error("TTS API failed");
 
-      // Получаем аудио как Blob
-      const audioBlob = await res.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      
-      if (audioRef.current) {
-        audioRef.current.src = audioUrl;
-        audioRef.current.play();
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        if (audioRef.current) {
+          audioRef.current.src = url;
+          audioRef.current.play().catch(() => {});
+        }
       }
-
     } catch (e) {
       console.error("TTS failed:", e);
-      // Опционально: показать ошибку пользователю
     }
   }, [personality.gender, personality.nsfw]);
 
-  // --- ЛОГИКА STT (Голосовой ввод) ---
-  const startSpeechToText = async () => {
-    if (loading || generatingPhoto) return;
-
-    if (isRecording) {
-      // 1. Остановка записи
-      mediaRecorderRef.current?.stop();
-      setIsRecording(false);
-      return;
-    }
-
-    try {
-      // 2. Запрос доступа к микрофону
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Используем mimeType для WebM, который лучше всего поддерживается Whisper
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=opus' });
-      
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-      
-      // 3. Сбор аудио-частей
-      mediaRecorder.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
-      };
-      
-      // 4. Обработка после остановки
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach(track => track.stop()); // Отключаем микрофон
-        
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        
-        if (audioBlob.size === 0) return; 
-
-        setLoading(true);
-        const formData = new FormData();
-        // ВАЖНО: имя поля должно быть 'audio' или 'file' в зависимости от API, 
-        // в app/api/stt/route.js ожидается 'audio'
-        formData.append("audio", audioBlob, "voice_message.webm"); 
-
-        try {
-          const res = await fetch("/api/stt", {
-            method: "POST",
-            body: formData, 
-          });
-
-          if (!res.ok) {
-            const errorData = await res.json().catch(() => ({ error: "STT API failed" }));
-            throw new Error(errorData.error || `STT error: ${res.status}`);
-          }
-          
-          const data = await res.json();
-          const recognizedText = data?.text?.trim();
-
-          if (recognizedText) {
-            setInput(recognizedText); // Помещаем распознанный текст в поле ввода
-          }
-
-        } catch (error) {
-          console.error("STT processing error:", error);
-          setMessages(prev => [...prev, { role: "assistant", content: `Ошибка распознавания: ${error.message}` }]);
-        } finally {
-          setLoading(false);
-        }
-      };
-      
-      // 5. Запуск записи
-      mediaRecorder.start();
-      setIsRecording(true);
-      
-    } catch (err) {
-      console.error("Microphone access denied:", err);
-      alert("Не удалось получить доступ к микрофону. Проверьте разрешения.");
-    }
-  };
-
-  // --- ЛОГИКА ОТПРАВКИ СООБЩЕНИЯ ---
-  const sendMessage = async () => {
-    if (!input.trim() || loading || isRecording) return;
-    const userMsg = input.trim();
-    
-    // 1. Создаём новый массив сообщений, включая текущее (для передачи контекста)
-    const newUserMessage = { role: "user", content: userMsg };
-    const newMessages = [...messages, newUserMessage];
-    
-    setMessages(newMessages); // Обновляем состояние на фронтенде
-    setInput("");
-    setLoading(true);
-    
-    // if (await handleSecretCommand(userMsg)) {
-    //   setLoading(false);
-    //   return;
-    // }
-    
-    try {
-      // 2. ОТПРАВЛЯЕМ ВЕСЬ МАССИВ СООБЩЕНИЙ ДЛЯ КОНТЕКСТА
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages, personality }),
-      });
-      
-      if (!res.ok) {
-        throw new Error("Chat API failed");
-      }
-      
-      const data = await res.json();
-      const reply = data?.reply || "Ошибка: Я временно потеряла соединение с сетью.";
-
-      // 3. Обновляем сообщения с ответом AI
-      setMessages(prev => [...prev, { role: "assistant", content: reply }]);
-      
-      // 4. Озвучиваем ответ (можно сделать опциональным)
-      // speak(reply); 
-
-    } catch (error) {
-      console.error("Chat error:", error);
-      setMessages(prev => [...prev, { role: "assistant", content: `Ошибка: ${error.message}.` }]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-  // --- ЛОГИКА ГЕНЕРАЦИИ ФОТО ---
-  const generatePhoto = async () => {
-    // Используем последнее сообщение пользователя как промпт, если оно есть
-    const lastUserMessage = messages.slice().reverse().find(m => m.role === 'user')?.content || "Красивая кибердевушка";
+  // Генерация фото
+  const generatePhoto = async (customPrompt = null) => {
+    if (generatingPhoto) return;
     setGeneratingPhoto(true);
-    
-    // Временное сообщение-запрос, чтобы показать действие
-    setMessages(prev => [...prev, { role: "user", content: `*Запрос на генерацию фото: ${lastUserMessage}*` }]);
+
+    const basePrompt = customPrompt || 
+      (personality.nsfw 
+        ? "очень красивая обнажённая девушка, неон, киберпанк, сексуальная поза, высокое качество" 
+        : "красивая девушка, неон, киберпанк, портрет, высокое качество");
 
     try {
       const res = await fetch("/api/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: lastUserMessage, nsfw: personality.nsfw }),
+        body: JSON.stringify({ prompt: basePrompt, nsfw: personality.nsfw }),
       });
 
-      if (!res.ok) {
-        // Пытаемся прочитать ошибку из JSON, если она есть
-        const errorData = await res.json().catch(() => ({ error: "Неизвестная ошибка API." }));
-        throw new Error(errorData.error || `Ошибка: ${res.status}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        setMessages(m => [...m, { role: "assistant", image: url }]);
+        speak("Вот твоё фото... нравится? 😏");
       }
-      
-      // ИЗМЕНЕНО: Получаем изображение как Blob
-      const imageBlob = await res.blob();
-      const imageUrl = URL.createObjectURL(imageBlob);
-
-      // Добавляем изображение в сообщения
-      setMessages(prev => [
-        ...prev.slice(0, -1), // Удаляем временное сообщение-запрос
-        { role: "assistant", content: ``, imageUrl: imageUrl }
-      ]);
-
-    } catch (error) {
-      console.error("Photo generation error:", error);
-      setMessages(prev => [
-         ...prev.slice(0, -1), // Удаляем временное сообщение-запрос
-         { role: "assistant", content: `Ошибка генерации: ${error.message}. Попробуй переформулировать промпт.` }
-      ]);
+    } catch (e) {
+      console.error("Photo generation failed:", e);
     } finally {
       setGeneratingPhoto(false);
     }
   };
 
-  // --- ВСПОМОГАТЕЛЬНЫЕ КОМПОНЕНТЫ ---
-  const Header = ({ title }) => (
-    <motion.header
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="p-4 md:p-6 bg-black/50 backdrop-blur-md border-b border-pink-500/50 shadow-neon z-10"
-    >
-      <h1 className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400">{title}</h1>
-    </motion.header>
-  );
+  // Отправка текстового сообщения
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
+    setInput("");
+    setMessages(m => [...m, { role: "user", content: userMsg }]);
+    setLoading(true);
 
-  const MessageBubble = ({ message, isLast }) => {
-    const isUser = message.role === "user";
-    const baseClasses = "max-w-[80%] p-3 md:p-4 rounded-xl shadow-lg relative break-words";
-    
-    // Проверяем, является ли сообщение изображением
-    const isImage = message.imageUrl && message.content.includes("[Image of");
-    
-    return (
-      <motion.div
-        layout
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}
-      >
-        <div className={`${baseClasses} ${isUser 
-          ? "bg-purple-800/80 text-white rounded-br-none border border-purple-500/50" 
-          : "bg-pink-800/80 text-white rounded-bl-none border border-pink-500/50"}`
-        }>
-          {isImage ? (
-            <div className="flex flex-col items-center">
-              <p className="text-xs italic mb-2 text-white/70">{message.content.replace(/[\[\]]/g, '')}</p>
-              {/* Image tag */}
-              <img 
-                src={message.imageUrl} 
-                alt={message.content} 
-                className="max-w-full h-auto rounded-lg" 
-              />
-            </div>
-          ) : (
-            <p className="whitespace-pre-wrap">{message.content}</p>
-          )}
-          {isLast && isUser && loading && (
-            <div className="absolute -bottom-1 -right-1 animate-ping p-1 rounded-full bg-pink-500" />
-          )}
-        </div>
-      </motion.div>
-    );
-  };
-  
-  const SetupStep = ({ title, options, onSelect }) => (
-    <div className="p-8 text-center">
-      <h2 className="text-3xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400">{title}</h2>
-      <div className="flex flex-col space-y-4">
-        {options.map((option) => (
-          <motion.button
-            key={option}
-            onClick={() => onSelect(option)}
-            className="px-6 py-3 text-lg font-semibold rounded-lg bg-white/10 hover:bg-white/20 border border-purple-500 hover:border-pink-500 transition-all shadow-neon spotlight-hover"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            {option}
-          </motion.button>
-        ))}
-      </div>
-    </div>
-  );
-  
-  const renderStep = () => {
-    switch (step) {
-      case "welcome":
-        return (
-          <div className="p-8 text-center">
-            <h2 className="text-4xl font-extrabold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">
-              ДОБРО ПОЖАЛОВАТЬ, {personality.gender ? personality.gender.toUpperCase() : "СТРАННИК"}!
-            </h2>
-            <p className="text-lg mb-8 text-gray-300">
-              Я твой AI-компаньон. Мои функции полностью настраиваются.
-            </p>
-            <motion.button
-              onClick={() => setStep("setupGender")}
-              className="px-8 py-3 text-lg font-semibold rounded-full bg-gradient-to-r from-pink-500 to-red-500 shadow-neon pulse-glow spotlight-hover"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Начать настройку
-            </motion.button>
-          </div>
-        );
-      case "setupGender":
-        return (
-          <SetupStep 
-            title="Шаг 1: Выбери свою Персону"
-            options={["Мужчина", "Женщина", "Нейтрал"]}
-            onSelect={(val) => {
-              setPersonality(p => ({ ...p, gender: val }));
-              setStep("setupMode");
-            }}
-          />
-        );
-      case "setupMode":
-        return (
-          <SetupStep 
-            title="Шаг 2: Режим общения"
-            options={["Друг/Поддержка", "Флирт/Игривый"]}
-            onSelect={(val) => {
-              setPersonality(p => ({ ...p, mode: val === "Флирт/Игривый" ? "flirt" : "friend" }));
-              setStep("setupNSFW");
-            }}
-          />
-        );
-      case "setupNSFW":
-        return (
-          <SetupStep 
-            title="Шаг 3: Откровенный контент (18+)"
-            options={["ON (Без цензуры)", "OFF (Цензура)"]}
-            onSelect={(val) => {
-              setPersonality(p => ({ ...p, nsfw: val === "ON (Без цензуры)" }));
-              setStep("chat");
-            }}
-          />
-        );
-      case "chat":
-        return (
-          <motion.div 
-            className="flex-1 overflow-y-auto p-4 md:p-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-          >
-            <AnimatePresence>
-              {messages.map((msg, index) => (
-                <MessageBubble key={index} message={msg} isLast={index === messages.length - 1} />
-              ))}
-            </AnimatePresence>
-            <div ref={messagesEndRef} />
-          </motion.div>
-        );
-      default:
-        return null;
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [...messages, { role: "user", content: userMsg }], personality }),
+      });
+
+      if (res.ok) {
+        const { reply } = await res.json();
+        setMessages(m => [...m, { role: "assistant", content: reply }]);
+        speak(reply);
+      }
+    } catch (e) {
+      setMessages(m => [...m, { role: "assistant", content: "Ой, что-то пошло не так... попробуй ещё раз ❤️" }]);
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Секретные команды (NSFW)
+  useEffect(() => {
+    if (!personality.nsfw || messages.length === 0) return;
+    const lastUserMsg = messages[messages.length - 1]?.content?.toLowerCase();
+    if (!lastUserMsg) return;
+
+    if (lastUserMsg.includes("раздевайся") || lastUserMsg.includes("голая")) {
+      generatePhoto("полностью обнажённая, эротическая поза, неон, высокое качество");
+      speak("Ммм... да, малыш... смотри на меня... аххх...");
+    } else if (lastUserMsg.includes("хочу тебя") || lastUserMsg.includes("трахни")) {
+      speak("Оххх... дааа... глубже... не останавливайся!");
+      generatePhoto("возбуждённая девушка, лежит на кровати, эротика");
+    }
+  }, [messages, personality.nsfw]);
+
   return (
-    <div className="min-h-screen w-screen flex flex-col neon-bg">
-      <Header title="NEON GLOW AI" />
+    <div className="min-h-screen neon-bg flex flex-col">
+      <audio ref={audioRef} className="hidden" />
 
-      <main className="flex-1 flex flex-col w-full max-w-4xl mx-auto backdrop-blur-xs bg-black/40 shadow-xl shadow-purple-900/50">
-        {renderStep()}
-      </main>
+      <AnimatePresence mode="wait">
+        {step === "welcome" && (
+          <motion.div key="welcome" className="flex-1 flex items-center justify-center p-6">
+            <div className="text-center">
+              <h1 className="text-6xl md:text-8xl font-bold mb-8 bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">
+                Neon Glow AI
+              </h1>
+              <p className="text-xl md:text-2xl mb-12">Твой цифровой спутник 18+</p>
+              <button
+                onClick={() => setStep("setup")}
+                className="px-12 py-6 text-2xl rounded-full bg-gradient-to-r from-purple-600 to-pink-600 pulse-glow spotlight-hover"
+              >
+                Начать <Sparkles className="inline ml-3" />
+              </button>
+            </div>
+          </motion.div>
+        )}
 
-      {/* Input / Controls Footer */}
-      {step === "chat" && (
-        <motion.footer
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 100 }}
-          className="p-4 md:p-6 bg-black/70 backdrop-blur-md border-t border-purple-500/50 flex items-center space-x-2 md:space-x-4 w-full max-w-4xl mx-auto"
-        >
-          {/* STT Button (Mic) */}
-          <button 
-            onClick={startSpeechToText} 
-            disabled={loading || generatingPhoto}
-            className={`p-3 md:p-4 rounded-full disabled:opacity-30 pulse-glow spotlight-hover flex items-center justify-center 
-              ${isRecording 
-                ? 'bg-red-500 ring-2 ring-red-300 animate-pulse' 
-                : 'bg-gradient-to-r from-cyan-400 to-blue-500'}`}
-          >
-            {/* Иконка меняется с Mic на Square при записи */}
-            {isRecording ? <Square className="w-6 h-6 md:w-8 md:h-8" /> : <Mic className="w-6 h-6 md:w-8 md:h-8" />}
-          </button>
-          
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-            placeholder={loading ? "AI думает..." : isRecording ? "Идёт запись..." : "Напиши что-нибудь..."}
-            disabled={loading || generatingPhoto || isRecording}
-            className="flex-1 px-4 py-3 md:py-4 rounded-full bg-gray-900/80 text-white placeholder-gray-500 border border-purple-500 focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none transition-all"
-          />
+        {step === "chat" && (
+          <motion.div key="chat" className="flex-1 flex flex-col">
+            {/* Сообщения */}
+            <div className="flex-1 overflow-y-auto p-4 pb-32">
+              <div className="max-w-4xl mx-auto space-y-4">
+                {messages.map((m, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div className={`max-w-md px-6 py-4 rounded-3xl backdrop-blur border-2 shadow-lg ${
+                      m.role === "user"
+                        ? "border-white/30 bg-white/20 text-white"
+                        : personality.nsfw
+                          ? "border-red-500 bg-red-900/50 text-white pulse-glow"
+                          : "border-pink-400 bg-pink-900/40 text-white pulse-glow"
+                    }`}>
+                      {m.image ? (
+                        <img src={m.image} alt="AI Photo" className="rounded-2xl max-w-full" />
+                      ) : (
+                        m.content
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+                {loading && <div className="text-center text-2xl animate-pulse">Думает...</div>}
+                {generatingPhoto && <div className="text-center text-2xl animate-pulse">Генерирую фото...</div>}
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
 
-          {/* Random Command Button (Heart) */}
-          <button onClick={() => {
-            const cmds = personality.nsfw
-                ? ["раздевайся", "стон", "хочу тебя", "в попу", "кончи в меня"]
-                : ["поцелуй", "обними", "ты красивая", "я скучал"];
-            setInput(cmds[Math.floor(Math.random() * cmds.length)]);
-          }} className="p-3 md:p-4 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 pulse-glow spotlight-hover flex items-center justify-center">
-            <Heart className="w-6 h-6 md:w-8 md:h-8" />
-          </button>
-          
-          {/* Send Button */}
-          <button onClick={sendMessage} disabled={loading || !input.trim() || isRecording} className="p-3 md:p-4 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 disabled:opacity-30 pulse-glow spotlight-hover flex items-center justify-center">
-            <MessageCircle className="w-6 h-6 md:w-8 md:h-8" />
-          </button>
-          
-          {/* Photo Button */}
-          <button onClick={() => generatePhoto()} disabled={generatingPhoto || isRecording} className="p-3 md:p-4 rounded-full bg-gradient-to-r from-red-600 to-pink-600 disabled:opacity-30 pulse-glow spotlight-hover flex items-center justify-center">
-            {generatingPhoto ? <Sparkles className="w-6 h-6 md:w-8 md:h-8 animate-spin" /> : <Camera className="w-6 h-6 md:w-8 md:h-8" />}
-          </button>
-        </motion.footer>
-      )}
+            {/* Панель ввода */}
+            <div className="p-4 bg-black/70 backdrop-blur-md border-t border-white/10 sticky bottom-0">
+              <div className="max-w-4xl mx-auto flex gap-3 items-center">
+                <input
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
+                  placeholder="Напиши что-нибудь..."
+                  className="flex-1 px-5 py-4 rounded-full bg-white/10 backdrop-blur border border-white/20 focus:border-pink-400 outline-none text-lg transition-all"
+                />
 
-      {/* Audio Element for TTS */}
-      <audio ref={audioRef} preload="auto" />
+                <button
+                  onClick={() => {
+                    const cmds = personality.nsfw
+                      ? ["раздевайся", "стон", "хочу тебя", "трахни меня"]
+                      : ["поцелуй", "обними", "ты красивая", "я скучал"];
+                    setInput(cmds[Math.floor(Math.random() * cmds.length)]);
+                  }}
+                  className="p-4 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 pulse-glow spotlight-hover"
+                >
+                  <Heart className="w-7 h-7" />
+                </button>
+
+                <button
+                  onClick={sendMessage}
+                  disabled={loading || !input.trim()}
+                  className="p-4 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 disabled:opacity-30 pulse-glow spotlight-hover"
+                >
+                  <MessageCircle className="w-7 h-7" />
+                </button>
+
+                <button
+                  onClick={() => generatePhoto()}
+                  disabled={generatingPhoto}
+                  className="p-4 rounded-full bg-gradient-to-r from-red-600 to-pink-600 disabled:opacity-30 pulse-glow spotlight-hover"
+                >
+                  <Camera className="w-7 h-7" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
