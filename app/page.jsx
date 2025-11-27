@@ -1,68 +1,60 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
-export default function HomePage() {
+export default function Home() {
   const [message, setMessage] = useState("");
   const [chat, setChat] = useState([]);
   const [loading, setLoading] = useState(false);
-
   const [personality, setPersonality] = useState({
     gender: "Женщина",
     mode: "flirt",
     nsfw: true,
   });
 
-  const [imgLoading, setImgLoading] = useState(false);
   const [generatedImage, setGeneratedImage] = useState(null);
-
+  const [imgLoading, setImgLoading] = useState(false);
   const endRef = useRef(null);
 
   useEffect(() => {
-    if (endRef.current) endRef.current.scrollIntoView({ behavior: "smooth" });
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat]);
 
-  // === ОТПРАВКА ТЕКСТА В ЧАТ ===
+  // ========== Отправка сообщений ==========
   async function sendMessage() {
     if (!message.trim() || loading) return;
 
     const userMsg = { role: "user", content: message };
-    setChat((prev) => [...prev, userMsg]);
-
-    const currentMessage = message;
+    setChat((c) => [...c, userMsg]);
+    const current = message;
     setMessage("");
-
     setLoading(true);
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: currentMessage,
-          personality,
-        }),
+        body: JSON.stringify({ message: current, personality }),
       });
 
       const data = await res.json();
-      const reply = data.reply || "Я задумалась…";
+      const reply = data.reply ?? "...";
 
-      setChat((prev) => [...prev, { role: "assistant", content: reply }]);
-      ttsSpeak(reply);
-    } catch (e) {
-      console.error(e);
-      setChat((prev) => [
-        ...prev,
-        { role: "assistant", content: "Произошла ошибка, но я рядом ❤️" },
+      setChat((c) => [...c, { role: "assistant", content: reply }]);
+      playTTS(reply);
+    } catch (err) {
+      setChat((c) => [
+        ...c,
+        { role: "assistant", content: "Ошибка… но я рядом ❤️" },
       ]);
-    } finally {
-      setLoading(false);
     }
+
+    setLoading(false);
   }
 
-  // === TTS: озвучка ответа ===
-  async function ttsSpeak(text) {
+  // ========== Голос (TTS) ==========
+  async function playTTS(text) {
     try {
       const res = await fetch("/api/tts", {
         method: "POST",
@@ -70,61 +62,80 @@ export default function HomePage() {
         body: JSON.stringify({ text }),
       });
 
-      if (!res.ok) return;
-      const audioData = await res.arrayBuffer();
-      const blob = new Blob([audioData], { type: "audio/mpeg" });
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
+      const buffer = await res.arrayBuffer();
+
+      const audio = new Audio(URL.createObjectURL(new Blob([buffer])));
       audio.play();
-    } catch (e) {
-      console.error("TTS ERR:", e);
-    }
+    } catch {}
   }
 
-  // === Генерация изображения ===
+  // ========== Генерация изображения ==========
   async function generateImage() {
-    if (imgLoading) return;
-
     setImgLoading(true);
-    setGeneratedImage(null);
-
     try {
       const res = await fetch("/api/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: "portrait of beautiful girl, soft neon light, cinematic glow",
+          prompt: "beautiful neon portrait girl 2025 style",
           personality,
         }),
       });
-
       const data = await res.json();
-      if (data.image) {
-        setGeneratedImage(`data:image/png;base64,${data.image}`);
-      }
-    } catch (e) {
-      console.error(e);
+      setGeneratedImage(`data:image/png;base64,${data.image}`);
     } finally {
       setImgLoading(false);
     }
   }
 
+  // ========== UI ==========
   return (
-    <div className="w-full min-h-screen bg-black text-white flex flex-col items-center px-4 py-6">
-      <h1 className="text-3xl font-bold mb-4">
-        Neon Glow AI — Твой персональный ИИ
-      </h1>
+    <div className="relative min-h-screen w-full bg-black overflow-hidden text-white flex items-center justify-center">
 
-      {/* === ПАНЕЛЬ НАСТРОЕК ПЕРСОНАЖА === */}
-      <div className="w-full max-w-xl bg-white/5 p-4 rounded-xl border border-white/10 mb-6">
-        <h2 className="text-lg font-semibold mb-2">Настройки персонажа</h2>
+      {/* ----- АНИМИРОВАННЫЕ ЧАСТИЦЫ ФОНА ----- */}
+      <div className="pointer-events-none absolute inset-0 z-0 opacity-40">
+        {[...Array(30)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-2 h-2 bg-pink-500 rounded-full blur-md"
+            initial={{
+              x: Math.random() * 800 - 400,
+              y: Math.random() * 800 - 400,
+              scale: Math.random() * 1.5,
+            }}
+            animate={{
+              x: Math.random() * 800 - 400,
+              y: Math.random() * 800 - 400,
+              scale: Math.random() * 1.5,
+            }}
+            transition={{
+              duration: 12 + Math.random() * 10,
+              repeat: Infinity,
+              ease: "ease-in-out",
+            }}
+          />
+        ))}
+      </div>
 
-        <div className="flex flex-col gap-3">
-          {/* Пол */}
+      {/* ----- ОКНО ----- */}
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative z-10 w-full max-w-2xl mx-auto backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl shadow-2xl p-6"
+      >
+        {/* ---------- Персонаж ---------- */}
+        <div className="flex justify-between items-center mb-5">
           <div>
-            <label className="text-sm">Пол:</label>
+            <h1 className="text-3xl font-bold tracking-wide">Neon Glow AI</h1>
+            <p className="text-sm text-white/60">Твой цифровой спутник</p>
+          </div>
+
+          <motion.div
+            whileHover={{ scale: 1.1 }}
+            className="rounded-2xl bg-white/10 px-4 py-2 border border-white/20 shadow-lg"
+          >
             <select
-              className="bg-black border border-white/20 rounded px-3 py-1 w-full text-sm"
+              className="bg-transparent outline-none text-white text-sm"
               value={personality.gender}
               onChange={(e) =>
                 setPersonality((p) => ({ ...p, gender: e.target.value }))
@@ -134,102 +145,79 @@ export default function HomePage() {
               <option>Мужчина</option>
               <option>Нейтральный</option>
             </select>
-          </div>
-
-          {/* Режим */}
-          <div>
-            <label className="text-sm">Режим общения:</label>
-            <select
-              className="bg-black border border-white/20 rounded px-3 py-1 w-full text-sm"
-              value={personality.mode}
-              onChange={(e) =>
-                setPersonality((p) => ({ ...p, mode: e.target.value }))
-              }
-            >
-              <option value="flirt">Флирт</option>
-              <option value="friendly">Дружеский</option>
-            </select>
-          </div>
-
-          {/* NSFW */}
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={personality.nsfw}
-              onChange={(e) =>
-                setPersonality((p) => ({ ...p, nsfw: e.target.checked }))
-              }
-            />
-            <span className="text-sm">NSFW (мягко допустимое)</span>
-          </div>
+          </motion.div>
         </div>
-      </div>
 
-      {/* === ЧАТ === */}
-      <div className="w-full max-w-xl flex flex-col flex-1 bg-white/5 border border-white/10 rounded-xl p-4">
-        <div className="flex-1 overflow-y-auto pr-1 space-y-3">
-          {chat.map((m, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`w-full flex ${
-                m.role === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
-              <div
-                className={`max-w-[80%] px-3 py-2 rounded-lg text-sm ${
-                  m.role === "user"
-                    ? "bg-pink-500 text-black font-semibold"
-                    : "bg-white/10 border border-white/10"
+        {/* ---------- ЧАТ ---------- */}
+        <div className="h-[55vh] overflow-y-auto pr-2 space-y-4 mb-4">
+          <AnimatePresence>
+            {chat.map((msg, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0 }}
+                className={`flex ${
+                  msg.role === "user" ? "justify-end" : "justify-start"
                 }`}
               >
-                {m.content}
-              </div>
-            </motion.div>
-          ))}
+                <div
+                  className={`px-4 py-3 max-w-[80%] rounded-2xl text-sm tracking-wide backdrop-blur-xl ${
+                    msg.role === "user"
+                      ? "bg-pink-500 text-black font-medium shadow-xl"
+                      : "bg-white/10 border border-white/10 shadow-xl"
+                  }`}
+                >
+                  {msg.content}
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
           <div ref={endRef} />
         </div>
 
-        {/* === ОТПРАВКА СООБЩЕНИЯ === */}
-        <div className="mt-3 flex gap-2">
-          <input
-            className="flex-1 bg-black border border-white/20 rounded-xl px-3 py-2 text-sm"
-            placeholder="Напиши сообщение…"
+        {/* ---------- ВВОД СООБЩЕНИЯ ---------- */}
+        <div className="flex gap-3">
+          <motion.input
+            whileFocus={{ scale: 1.02 }}
+            className="flex-1 px-4 py-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl outline-none text-sm placeholder-white/40"
+            placeholder="Напиши что-нибудь…"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           />
-          <button
+
+          <motion.button
+            whileTap={{ scale: 0.9 }}
             onClick={sendMessage}
-            disabled={loading}
-            className="px-4 py-2 bg-pink-600 rounded-xl text-sm disabled:opacity-50"
+            className="px-5 py-3 bg-pink-600 rounded-2xl shadow-lg text-sm font-semibold"
           >
-            {loading ? "..." : "▶"}
-          </button>
+            {loading ? "..." : "Отпр."}
+          </motion.button>
         </div>
-      </div>
 
-      {/* === БЛОК ГЕНЕРАЦИИ ИЗОБРАЖЕНИЙ === */}
-      <div className="w-full max-w-xl bg-white/5 p-4 mt-6 rounded-xl border border-white/10 flex flex-col items-center">
-        <h2 className="font-semibold mb-3">Генерация изображения</h2>
+        {/* ---------- КНОПКА ГЕНЕРАЦИИ ИЗОБРАЖЕНИЙ ---------- */}
+        <div className="flex flex-col items-center mt-8">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={generateImage}
+            className="px-6 py-3 bg-purple-600 rounded-2xl shadow-xl font-medium"
+          >
+            {imgLoading ? "Генерация…" : "Создать изображение"}
+          </motion.button>
 
-        <button
-          onClick={generateImage}
-          disabled={imgLoading}
-          className="px-5 py-2 bg-purple-600 rounded-xl mb-4"
-        >
-          {imgLoading ? "Генерирую…" : "Создать изображение"}
-        </button>
-
-        {generatedImage && (
-          <img
-            src={generatedImage}
-            alt="Generated"
-            className="rounded-xl shadow-xl border border-white/20 w-full"
-          />
-        )}
-      </div>
+          {generatedImage && (
+            <motion.img
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              src={generatedImage}
+              className="w-full mt-6 rounded-3xl shadow-2xl border border-white/10"
+            />
+          )}
+        </div>
+      </motion.div>
     </div>
   );
 }
