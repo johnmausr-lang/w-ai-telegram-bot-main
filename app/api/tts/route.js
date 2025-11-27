@@ -2,10 +2,10 @@ export const runtime = "edge";
 
 export async function POST(req) {
   try {
-    const { text, voice = "nova" } = await req.json();
+    const { text } = await req.json();
 
-    if (!text || text.trim().length === 0) {
-      return new Response("No text provided", { status: 400 });
+    if (!process.env.OPENAI_API_KEY) {
+      return new Response("Missing OPENAI_API_KEY", { status: 500 });
     }
 
     const response = await fetch("https://api.openai.com/v1/audio/speech", {
@@ -16,9 +16,9 @@ export async function POST(req) {
       },
       body: JSON.stringify({
         model: "gpt-4o-mini-tts",
-        voice,
-        input: text,
+        voice: "alloy", 
         format: "mp3",
+        input: text,
       }),
     });
 
@@ -27,13 +27,11 @@ export async function POST(req) {
       return new Response("TTS failed", { status: 500 });
     }
 
-    const audioBuffer = await response.arrayBuffer();
+    const audio = await response.arrayBuffer();
 
-    return new Response(audioBuffer, {
+    return new Response(audio, {
       status: 200,
-      headers: {
-        "Content-Type": "audio/mpeg",
-      },
+      headers: { "Content-Type": "audio/mpeg" },
     });
 
   } catch (error) {
