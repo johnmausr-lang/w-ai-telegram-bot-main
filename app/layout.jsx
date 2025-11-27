@@ -1,17 +1,9 @@
-// Файл: layout.jsx
+// app/layout.jsx
 import "./globals.css";
 
 export const metadata = {
   title: "Neon Glow AI",
-  description: "Твой 18+ цифровой спутник",
-};
-
-export const viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  viewportFit: "cover",
+  description: "Персональный AI-компаньон",
 };
 
 export default function RootLayout({ children }) {
@@ -21,7 +13,7 @@ export default function RootLayout({ children }) {
         <meta name="theme-color" content="#000000" />
         <link rel="manifest" href="/manifest.json" />
       </head>
-      <body className="min-h-screen w-screen overflow-hidden bg-black text-white antialiased flex flex-col">
+      <body className="bg-black text-white min-h-screen overflow-x-hidden antialiased">
         {children}
       </body>
     </html>
