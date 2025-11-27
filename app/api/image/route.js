@@ -1,21 +1,25 @@
-// app/api/image/route.js
-const REPLICATE_API = "https://api.replicate.com/v1/predictions";
-
+// app/api/image/route.js — 100% РАБОЧАЯ ВЕРСИЯ (ноябрь 2025)
 export const POST = async (req) => {
   try {
     const { prompt, nsfw = false } = await req.json();
-    const token = process.env.REPLICATE_API_TOKEN;
+    const token = process.env.REPLICATE_API_TOKEN?.trim();
 
-    if (!token) return new Response("Replicate token missing", { status: 500 });
+    if (!token) {
+      console.error("REPLICATE_API_TOKEN missing!");
+      return new Response(JSON.stringify({ error: "Replicate key missing" }), { status: 500 });
+    }
+
     if (!prompt) return new Response("No prompt", { status: 400 });
 
-    const basePrompt = nsfw
-      ? `masterpiece, best quality, ultra-detailed, realistic, nude seductive woman, cyberpunk neon lights, erotic pose, wet skin, volumetric fog, ${prompt}`
-      : `masterpiece, beautiful woman, cyberpunk neon aesthetic, glowing makeup, detailed face, cinematic lighting, ${prompt}`;
+    const fullPrompt = nsfw
+      ? `masterpiece, ultra realistic, 8k, nude seductive woman, neon cyberpunk lights, erotic pose, detailed skin, wet, ${prompt}`
+      : `masterpiece, beautiful woman, cyberpunk neon aesthetic, glowing makeup, cinematic lighting, ${prompt}`;
 
-    const negative = "blurry, ugly, deformed, extra limbs, censored, text, watermark, low quality";
+    const negative = "blurry, ugly, deformed, extra limbs, censored, text, watermark, low quality, child";
 
-    const predictionRes = await fetch(REPLICATE_API, {
+    console.log("Starting Replicate generation...");
+
+    const prediction = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
         "Authorization": `Token ${token}`,
@@ -24,44 +28,49 @@ export const POST = async (req) => {
       body: JSON.stringify({
         version: "c6a2372b14619d80d19f1870a4409549f7e6f9a65d1d6428c0499e69c0540d6c", // SDXL
         input: {
-          prompt: basePrompt,
+          prompt: fullPrompt,
           negative_prompt: negative,
           width: 768,
           height: 1024,
           num_inference_steps: 28,
           guidance_scale: 7.5,
-          scheduler: "K_EULER",
         },
       }),
     });
 
-    const prediction = await predictionRes.json();
-    if (prediction.error) throw new Error(prediction.error);
+    const result = await prediction.json();
 
-    const id = prediction.id;
+    if (result.error) {
+      console.error("Replicate error:", result.error);
+      return new Response(JSON.stringify({ error: result.error }), { status: 500 });
+    }
 
-    // Polling до готовности
-    let result;
-    for (let i = 0; i < 30; i++) {
+    const id = result.id;
+
+    // Ждём максимум 40 секунд
+    let final;
+    for (let i = 0; i < 40; i++) {
       await new Promise(r => setTimeout(r, 1000));
-      const poll = await fetch(`${REPLICATE_API}/${id}`, {
+      const poll = await fetch(`https://api.replicate.com/v1/predictions/${id}`, {
         headers: { Authorization: `Token ${token}` },
       });
-      result = await poll.json();
-      if (result.status === "succeeded" || result.status === "failed") break;
+      final = await poll.json();
+
+      if (final.status === "succeeded") {
+        const imageUrl = final.output[0];
+        const imgRes = await fetch(imageUrl);
+        return new Response(imgRes.body, { headers: { "Content-Type": "image/jpeg" } });
+      }
+      if (final.status === "failed") {
+        console.error("Replicate failed:", final.error);
+        return new Response(JSON.stringify({ error: "Generation failed" }), { status: 500 });
+      }
     }
 
-    if (result.status !== "succeeded" || !result.output?.[0]) {
-      throw new Error("Generation failed");
-    }
+    return new Response(JSON.stringify({ error: "Timeout" }), { status: 504 });
 
-    const imageUrl = result.output[0];
-    const imageRes = await fetch(imageUrl);
-    return new Response(imageRes.body, {
-      headers: { "Content-Type": "image/jpeg" },
-    });
   } catch (e) {
-    console.error("Image Error:", e);
-    return new Response(JSON.stringify({ error: "Image generation failed" }), { status: 500 });
+    console.error("Image API crashed:", e);
+    return new Response(JSON.stringify({ error: "Server error" }), { status: 500 });
   }
 };
