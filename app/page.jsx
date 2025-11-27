@@ -1,6 +1,5 @@
 // Файл: page.jsx (Полный и исправленный код)
 "use client";
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Heart, MessageCircle, Camera, Mic, Volume2, StopCircle } from "lucide-react"; 
