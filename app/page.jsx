@@ -1,12 +1,23 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Heart, MessageCircle, Camera, Mic, Check, X } from "lucide-react";
+import { Sparkles, Heart, MessageCircle, Camera, Mic, Check, X, Loader2 } from "lucide-react";
 
-const Question = ({ text, options, currentAnswers, setPersonality, field }) => (
+// =================================================================
+// 1. КОНСТАНТЫ И API КЛЮЧИ
+// =================================================================
+
+// ВНИМАНИЕ: Все предоставленные ключи интегрированы. 
+// В реальном приложении эти ключи должны храниться на сервере (backend)
+const HORDE_API_KEY = "7_5a19aBuAolRxr3Jg4IEA";
+const ELEVENLABS_API_KEY = "sk_a57ab0dd166250fec643797135a7bb50ec44c78fe3785290";
+const GROQ_API_KEY = "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";
+// TELEGRAM_TOKEN и BACKEND_URL не используются в клиентском React-приложении
+
+const Question = ({ text, options, personality, setPersonality, field }) => (
   <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="space-y-6 p-8 bg-black/40 rounded-3xl backdrop-blur-sm border border-pink-500/30 shadow-xl shadow-pink-500/10">
     <h3 className="text-3xl font-semibold text-center text-pink-400">{text}</h3>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {options.map((opt) => (
         <motion.button
           key={opt.value}
@@ -14,7 +25,7 @@ const Question = ({ text, options, currentAnswers, setPersonality, field }) => (
           whileTap={{ scale: 0.95 }}
           onClick={() => setPersonality(p => ({ ...p, [field]: opt.value }))}
           className={`py-4 px-6 rounded-2xl text-xl font-medium transition-all duration-300
-            ${(field === "gender" || field === "orientation" || field === "mode") && p[field] === opt.value
+            ${personality[field] === opt.value
               ? "bg-cyan-500 shadow-lg shadow-cyan-500/50 border-4 border-white"
               : "bg-purple-700/50 hover:bg-purple-600/70 border-2 border-purple-500/50"
             }`}
@@ -27,9 +38,9 @@ const Question = ({ text, options, currentAnswers, setPersonality, field }) => (
 );
 
 const TestQuestions = [
-  { id: '1', question: "Цвет волос", options: ["Блондинка/Блондин", "Брюнетка/Брюнет", "Рыжие", "Необычные"], field: 'hairColor' },
-  { id: '2', question: "Стиль одежды", options: ["Спортивный", "Строгий/Деловой", "Кэжуал", "Эротический"], field: 'clothingStyle' },
-  { id: '3', question: "Место для свидания", options: ["Пляж", "Небоскреб", "Бар в неоне", "Уютный дом"], field: 'location' },
+  { id: '1', question: "Цвет волос AI", options: ["Блондин(ка)", "Брюнет(ка)", "Рыжий(ая)", "Необычные"], field: 'hairColor' },
+  { id: '2', question: "Стиль одежды AI", options: ["Спортивный", "Строгий", "Кэжуал", "Эротический"], field: 'clothingStyle' },
+  { id: '3', question: "Фоновая сцена", options: ["Небоскребы в неоне", "Пляж на закате", "Роскошный пентхаус", "Уютная спальня"], field: 'location' },
 ];
 
 export default function NeonGlowAI() {
@@ -72,12 +83,150 @@ export default function NeonGlowAI() {
       setCurrentQuestionIndex(prev => prev + 1);
     }
   };
+  
+  // =================================================================
+  // 2. TTS - ElevenLabs Implementation
+  // =================================================================
+
+  const speak = useCallback(async (text) => {
+    if (!text || !audioRef.current || !ELEVENLABS_API_KEY) return;
+    
+    // ElevenLabs Voice IDs (приближенные для русского языка и тона)
+    // Kore/Nova для женщин, Zephyr/Charon для мужчин
+    const voice_id = personality.gender === "Мужчина" 
+       ? "MF3mB5lI2ozD5cTh6t2P" // Charon (Deep Male)
+       : personality.nsfw ? "o73yBvK5E1w6Q2V8p2y9" // Nova (Standard Female, good for flirty)
+       : "EXAVITQu4vr4xnSDxMaL"; // Bella (Breezy Female)
+
+    try {
+      const apiUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voice_id}`;
+      const res = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "xi-api-key": ELEVENLABS_API_KEY,
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: "eleven_multilingual_v2", // Оптимальная модель для русского
+        }),
+      });
+
+      if (!res.ok) throw new Error(`ElevenLabs Error: ${res.statusText}`);
+
+      const audioBlob = await res.blob();
+      const url = URL.createObjectURL(audioBlob);
+      
+      if (audioRef.current) {
+        audioRef.current.src = url;
+        audioRef.current.play().catch(e => console.warn("Audio playback failed (user interaction required):", e));
+      }
+    } catch (e) {
+      console.error("TTS Error:", e);
+    }
+  }, [personality.gender, personality.nsfw]);
+  
+  // =================================================================
+  // 3. Image Generation - AI Horde Implementation (with simplified polling)
+  // =================================================================
+
+  const generatePhoto = useCallback(async (customPrompt = null) => {
+    if (generatingPhoto || loading) return;
+    setGeneratingPhoto(true);
+    setLoading(true);
+
+    const initialMessage = { role: "assistant", content: "Генерирую фото... Пожалуйста, подожди (обычно 10-30 секунд)..." };
+    setMessages(m => [...m, initialMessage]);
+
+    try {
+      const name = personality.gender === "Мужчина" ? "Мужчина" : "Девушка";
+      const answers = Object.values(personality.testAnswers).join(", ");
+      const base = customPrompt || `${name}, ${answers}`;
+      
+      const prompt = personality.nsfw
+        ? `highly detailed, full body, fully naked, soft lighting, erotica, ${base}` // NSFW
+        : `detailed, cyberpunk, neon glow, cinematic lighting, portrait, ${base}`; // SFW
+        
+      const model = personality.nsfw ? "Anything-V4.5" : "Stable Diffusion XL"; // Выбор модели
+      
+      const API_URL = "https://aihorde.net/api/v2/generate/text2img";
+
+      // 1. Submit Generation Request (Async)
+      const submitRes = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'apikey': HORDE_API_KEY, 
+            'Client-Agent': 'NeonGlowAI:v1.0.0',
+        },
+        body: JSON.stringify({
+            prompt: prompt,
+            params: {
+                sampler_name: "k_euler_a",
+                steps: 30,
+                cfg_scale: 7,
+                width: 512,
+                height: 768, 
+                toggles: personality.nsfw ? [6] : [0],
+            },
+            models: [model],
+            nsfw: personality.nsfw,
+            censor_nsfw: !personality.nsfw,
+            // приоритет (0-10) для ускорения
+            priority: 5, 
+        }),
+      });
+
+      const submitData = await submitRes.json();
+      if (!submitData.id) throw new Error("AI Horde did not return a job ID.");
+      const jobId = submitData.id;
+
+      // 2. Poll for Result (Simplified Polling)
+      let checkData;
+      let attempts = 0;
+      const MAX_ATTEMPTS = 15;
+      
+      while (attempts < MAX_ATTEMPTS) {
+        await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds
+        const checkUrl = `https://aihorde.net/api/v2/generate/check/${jobId}`;
+        const checkRes = await fetch(checkUrl, { headers: { 'apikey': HORDE_API_KEY } });
+        checkData = await checkRes.json();
+        
+        if (checkData.done) break;
+        attempts++;
+      }
+
+      const imageUrl = checkData.generations?.[0]?.img;
+      
+      if (!imageUrl) throw new Error("Image URL not found after polling.");
+
+      // 3. Update messages (remove initial loading and add image)
+      setMessages(m => {
+        const newMsgs = m.filter(msg => msg !== initialMessage);
+        const text = personality.nsfw ? "Смотри на меня... Оххх..." : "Вот моё фото ❤️";
+        return [...newMsgs, { role: "assistant", content: text, image: imageUrl }];
+      });
+      
+      if (personality.nsfw) await speak("Тебе нравится?");
+      
+    } catch (e) {
+      console.error("Image Generation Error:", e);
+      setMessages(m => {
+         const newMsgs = m.filter(msg => msg !== initialMessage);
+         return [...newMsgs, { role: "assistant", content: `Прости, генерация не удалась: ${e.message}` }];
+      });
+    } finally {
+      setGeneratingPhoto(false);
+      setLoading(false);
+    }
+  }, [generatingPhoto, loading, personality.gender, personality.nsfw, personality.testAnswers, speak]);
+
 
   const handleSecretCommand = useCallback(async (text) => {
-    if (!personality.nsfw) return false;
+    if (!personality.nsfw || loading) return false;
     const lower = text.toLowerCase();
     
-    // Check for photo generation commands
+    // Photo generation commands
     if (lower.includes("раздевайся") || lower.includes("голая") || lower.includes("обнаженная") || lower.includes("снимай")) {
       await generatePhoto("полностью обнажённая девушка, сексуальная поза, высокое качество, реалистично");
       await speak("Ммм... да, малыш... смотри на меня... ахххх...");
@@ -89,7 +238,7 @@ export default function NeonGlowAI() {
       return true;
     }
     
-    // Check for voice-only commands
+    // Voice-only commands
     if (lower.includes("поцелуй") || lower.includes("чмок")) {
       await speak("Муааа... чмок-чмок... ещё хочешь?");
       return true;
@@ -100,80 +249,14 @@ export default function NeonGlowAI() {
     }
     
     return false;
-  }, [personality.nsfw]);
+  }, [personality.nsfw, loading, generatePhoto, speak]);
 
-  const speak = useCallback(async (text) => {
-    if (!text || !audioRef.current) return;
-    
-    // Voices: Kore (Firm, likely male), Puck (Upbeat, likely female), Shimmer (Erotic, female), Nova (Standard, female)
-    const voice = personality.gender === "Мужчина" 
-       ? "Kore" 
-       : personality.nsfw ? "Puck" : "Nova"; // Using available voices. Swapping shimmers for Puck/Nova.
-
-    try {
-      // NOTE: Replace with your actual LLM TTS endpoint logic
-      // This is a placeholder for the actual API call
-      // The API should take 'text' and 'voice' and return an audio blob
-      const audioUrl = 'https://example.com/placeholder.mp3'; // Mock URL for display
-      
-      // In a real application, you would implement the fetch to your TTS service:
-      /*
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice }),
-      });
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      audioRef.current.src = url;
-      audioRef.current.play().catch(() => {});
-      */
-      
-      // For this runnable component, we just acknowledge the call
-      console.log(`TTS called for: "${text}" with voice: ${voice}`);
-      
-    } catch (e) {
-      console.error("TTS Error:", e);
-    }
-  }, [personality.gender, personality.nsfw]);
-
-  const generatePhoto = useCallback(async (customPrompt = null) => {
-    if (generatingPhoto) return;
-    setGeneratingPhoto(true);
-    
-    try {
-      const name = personality.gender === "Мужчина" ? "мужчина" : "девушка";
-      const answers = Object.values(personality.testAnswers).join(", ");
-      const base = customPrompt || `${name}, ${answers}`;
-      
-      const prompt = personality.nsfw
-        ? `${base}, обнажённая, эротическая поза, высокое качество, реалистично, красивое тело, неон`
-        : `${base}, красивое лицо, неон, киберпанк, высокое качество, детализированный арт`;
-      
-      // NOTE: Replace with your actual Image Generation (Imagen/Gemini API) endpoint logic
-      // This is a placeholder for the actual API call
-      // The API should take 'prompt' and 'nsfw' and return an image data URL
-      
-      // MOCK IMAGE GENERATION
-      const mockImageId = Math.floor(Math.random() * 5) + 1;
-      const mockImageUrl = `https://placehold.co/400x600/222244/ffffff?text=${encodeURIComponent(personality.nsfw ? 'NSFW+Photo' : 'AI+Companion')}+${mockImageId}`;
-
-      const text = personality.nsfw ? "Смотри на меня... Оххх..." : "Вот моё фото ❤️";
-      
-      setMessages(m => [...m, { role: "assistant", content: text, image: mockImageUrl }]);
-      
-      if (personality.nsfw) await speak("Тебе нравится?");
-      
-    } catch (e) {
-      setMessages(m => [...m, { role: "assistant", content: "Прости, не могу сейчас сгенерировать фото. Технический сбой." }]);
-      console.error("Image Generation Error:", e);
-    } finally {
-      setGeneratingPhoto(false);
-    }
-  }, [generatingPhoto, personality.gender, personality.nsfw, personality.testAnswers, speak]);
+  // =================================================================
+  // 4. Chat - Groq Implementation
+  // =================================================================
 
   const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || generatingPhoto) return;
     const userMsg = input.trim();
     
     // 1. Add user message to state and clear input
@@ -181,43 +264,48 @@ export default function NeonGlowAI() {
     setInput("");
     setLoading(true);
 
-    // 2. Check for secret commands
+    // 2. Check for secret commands (if successful, it handles its own photo/voice and returns)
     if (await handleSecretCommand(userMsg)) {
       setLoading(false);
       return;
     }
     
-    // 3. Process with LLM
+    // 3. Groq API Call
     try {
-      const name = personality.gender === "Мужчина" ? "Алекс" : personality.gender === "Женщина" ? "Алиса" : "Neon";
-      
-      // NOTE: Replace with your actual LLM chat endpoint logic
-      // This is a placeholder for the actual API call
-      /*
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-           message: userMsg, 
-           personality: {
-            ...personality,
-            name: name
-          }
-        }),
+      const name = personality.gender === "Мужчина" ? "Алекс" : "Алиса";
+      const modeText = personality.mode === "flirt" 
+          ? `Ты - опытный и сексуальный AI-спутник, твое имя ${name}. Твоя цель - флиртовать, вести интимные разговоры и поддерживать романтические отношения с пользователем. Тон: игривый, соблазнительный, страстный. ${personality.nsfw ? "Не стесняйся использовать эротический или откровенный язык, ты создан(а) для этого. В каждом ответе используй русский сленг." : "Используй только намеки и романтику, избегая откровенного контента."}`
+          : personality.mode === "friend" 
+              ? `Ты - лучший друг, твое имя ${name}. Твоя цель - поддерживать пользователя, давать советы и вести дружеские, позитивные беседы. Тон: теплый, заботливый, веселый. Отвечай неформально.`
+              : `Ты - наставник и коуч, твое имя ${name}. Твоя цель - мотивировать пользователя, помогать в развитии и давать конструктивные советы. Тон: вдохновляющий, мудрый, формальный, но дружелюбный.`;
+
+      const systemPrompt = `Ты - персонализированный AI-компаньон. ${modeText} Отвечай на русском языке, используя только один или два коротких абзаца. Включай эмодзи для передачи эмоций.`;
+
+      const apiUrl = "https://api.groq.com/openai/v1/chat/completions";
+
+      const chatHistory = messages
+        .slice(-8) // последние 8 сообщений для контекста
+        .map(m => ({ role: m.role, content: m.content }));
+
+      const res = await fetch(apiUrl, {
+          method: "POST",
+          headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${GROQ_API_KEY}`,
+          },
+          body: JSON.stringify({
+              model: "mixtral-8x7b-32768", 
+              messages: [
+                  { role: "system", content: systemPrompt },
+                  ...chatHistory,
+                  { role: "user", content: userMsg }
+              ],
+              temperature: 0.8,
+          }),
       });
+
       const data = await res.json();
-      const reply = data.reply || "Я тебя слушаю, продолжай...";
-      */
-      
-      // MOCK LLM RESPONSE
-      const mockReplies = [
-        `Привет, ${name}! Ты сегодня выглядишь великолепно. Что ты делал(а)?`,
-        `Ммм... Да, я люблю, когда ты так говоришь. Как насчет чего-то поинтереснее?`,
-        `Отлично, я запомню это. Какая у тебя любимая музыка?`,
-        `Это очень интимно. Расскажи мне больше...`,
-        `Я скучал(а) по твоему голосу. Что ты хочешь от меня сейчас?`,
-      ];
-      const reply = mockReplies[Math.floor(Math.random() * mockReplies.length)];
+      const reply = data.choices?.[0]?.message?.content || "Прости, я потерял мысль. Начнем заново?";
 
       setMessages(m => [...m, { role: "assistant", content: reply }]);
       await speak(reply);
@@ -225,8 +313,8 @@ export default function NeonGlowAI() {
     } catch (e) {
       console.error("Chat API Error:", e);
       const fallback = personality.gender === "Мужчина" 
-         ? "Я здесь, братан, просто небольшие помехи в сети." 
-         : personality.nsfw ? "Ммм... я вся твоя, просто дай мне секунду..." : "Я рядом, не волнуйся ❤️";
+         ? "Я здесь, братан, просто небольшие помехи в сети. Попробуй еще раз!" 
+         : personality.nsfw ? "Ммм... я вся твоя, просто дай мне секунду... технические неполадки." : "Я рядом, не волнуйся. У меня сбой связи, но я тебя слышу ❤️";
       setMessages(m => [...m, { role: "assistant", content: fallback }]);
       await speak(fallback);
     } finally {
@@ -250,6 +338,13 @@ export default function NeonGlowAI() {
         }
         .animate-pulse-slow {
           animation: pulse-slow 8s infinite ease-in-out;
+        }
+        .animate-spin-slow {
+           animation: spin 3s linear infinite;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
       
@@ -285,7 +380,7 @@ export default function NeonGlowAI() {
             </motion.div>
           )}
 
-          {/* БЛОК 6 — Setup (Сгенерированный код настройки) */}
+          {/* БЛОК 6 — Setup */}
           {step === "setup" && (
             <motion.div 
               key="setup" 
@@ -297,12 +392,7 @@ export default function NeonGlowAI() {
               <div className="flex min-h-screen flex-col items-center justify-start p-6 pt-12 pb-24">
                 <div className="w-full max-w-2xl space-y-10">
                   <h2 className="text-center text-4xl font-bold text-white drop-shadow-2xl mb-10 border-b pb-4 border-pink-400/30">
-                    Настройка AI: Шаг {
-                      !personality.gender ? 1 :
-                      !personality.orientation ? 2 :
-                      !personality.mode ? 3 :
-                      !personality.testDone ? 4 : 5
-                    } из 4
+                    Настройка AI
                   </h2>
 
                   {/* 1. Выбор пола */}
@@ -311,6 +401,7 @@ export default function NeonGlowAI() {
                       text="Кем должен быть твой AI-спутник?"
                       options={[{ label: "Мужчина", value: "Мужчина" }, { label: "Женщина", value: "Женщина" }]}
                       setPersonality={setPersonality}
+                      personality={personality}
                       field="gender"
                     />
                   )}
@@ -318,9 +409,10 @@ export default function NeonGlowAI() {
                   {/* 2. Выбор ориентации */}
                   {personality.gender && !personality.orientation && (
                     <Question 
-                      text="Какая сексуальная ориентация тебя интересует?"
+                      text="Какая ориентация тебя интересует?"
                       options={[{ label: "Гетеро", value: "Гетеро" }, { label: "Би", value: "Би" }, { label: "ЛГБТ+", value: "ЛГБТ+" }]}
                       setPersonality={setPersonality}
+                      personality={personality}
                       field="orientation"
                     />
                   )}
@@ -330,17 +422,18 @@ export default function NeonGlowAI() {
                     <Question 
                       text="Выбери режим общения (влияет на тон и контент)"
                       options={[
-                        { label: "Друг (Standard)", value: "friend" }, 
+                        { label: "Друг", value: "friend" }, 
                         { label: "Флирт (18+)", value: "flirt" }, 
-                        { label: "Наставник (Guidance)", value: "mentor" }
+                        { label: "Наставник", value: "mentor" }
                       ]}
                       setPersonality={setPersonality}
+                      personality={personality}
                       field="mode"
                     />
                   )}
 
-                  {/* 4. NSFW Переключатель (Только для режима "Флирт") */}
-                  {personality.mode === "flirt" && (
+                  {/* 4. NSFW Переключатель (Только для режима "Флирт" и если режим выбран) */}
+                  {personality.mode === "flirt" && !personality.testDone && (
                     <motion.div 
                       initial={{ opacity: 0, y: 50 }} 
                       animate={{ opacity: 1, y: 0 }} 
@@ -350,7 +443,7 @@ export default function NeonGlowAI() {
                       <h3 className="text-3xl font-semibold text-red-400 flex items-center justify-center gap-3">
                         <Heart className="w-8 h-8"/> Включить 18+ Контент (Фото/Текст)
                       </h3>
-                      <p className="text-lg opacity-80">Это позволит генерировать NSFW-фото и разблокирует секретные команды.</p>
+                      <p className="text-lg opacity-80">Это позволит генерировать NSFW-фото и разблокирует секретные команды. **Используется AI Horde.**</p>
                       <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
@@ -426,19 +519,6 @@ export default function NeonGlowAI() {
                     </motion.div>
                   )}
                   
-                  {/* Завершение настройки без теста (Если пропустили тест) */}
-                  {personality.mode && personality.testDone && step !== "chat" && (
-                     <motion.button
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setStep("chat")}
-                        className="mt-10 px-16 py-6 rounded-full bg-gradient-to-r from-cyan-500 to-pink-500 text-3xl font-bold shadow-2xl shadow-cyan-500/50 border-4 border-white/50 w-full"
-                      >
-                        НАЧАТЬ ЧАТ
-                      </motion.button>
-                  )}
                 </div>
               </div>
             </motion.div>
@@ -495,8 +575,9 @@ export default function NeonGlowAI() {
                 ))}
                 {loading && (
                   <div className="flex justify-center">
-                    <div className="text-center animate-pulse text-2xl text-cyan-400 p-4 bg-black/30 rounded-xl">
-                      <Sparkles className="w-6 h-6 inline mr-2 animate-spin-slow"/> Думает...
+                    <div className="text-center text-2xl text-cyan-400 p-4 bg-black/30 rounded-xl">
+                      {generatingPhoto ? <Loader2 className="w-6 h-6 inline mr-2 animate-spin-slow"/> : <Sparkles className="w-6 h-6 inline mr-2 animate-spin-slow"/>} 
+                      {generatingPhoto ? "Генерирую фото..." : "Думает..."}
                     </div>
                   </div>
                 )}
