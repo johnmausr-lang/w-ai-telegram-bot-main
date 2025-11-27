@@ -1,53 +1,44 @@
-// Файл: app/api/stt/route.js (GROQ Whisper API)
-const GROQ_WHISPER_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
+export const runtime = "edge";
 
-export const POST = async (req) => {
+export async function POST(req) {
   try {
-    const GROQ_API_KEY = process.env.GROQ_API_KEY;
+    const formData = await req.formData();
+    const audio = formData.get("file");
 
-    if (!GROQ_API_KEY) {
-      return new Response(JSON.stringify({ error: "GROQ API Key is missing" }), { status: 500 });
+    if (!audio) {
+      return new Response("Audio file missing", { status: 400 });
     }
-    
-    const formData = new FormData();
-    const body = await req.formData();
-    const audioFile = body.get('audio');
-    
-    if (!audioFile) {
-        return new Response(JSON.stringify({ error: "Audio file not provided" }), { status: 400 });
-    }
-    
-    // Передаём файл в виде Blob или File
-    formData.append("file", audioFile, "voice_message.webm");
-    formData.append("model", "whisper-large-v3");
-    formData.append("response_format", "json");
-    formData.append("language", "ru"); // Указываем русский язык для лучшего качества
 
-    const response = await fetch(GROQ_WHISPER_URL, {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${GROQ_API_KEY}`,
-        },
-        body: formData,
+    const buffer = await audio.arrayBuffer();
+
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: (() => {
+        const fd = new FormData();
+        fd.append("file", new Blob([buffer]), "audio.webm");
+        fd.append("model", "gpt-4o-mini-tts");
+        fd.append("language", "ru");
+        return fd;
+      })(),
     });
 
     if (!response.ok) {
-        const errorText = await response.text();
-        // Улучшенное логирование ошибки
-        console.error("GROQ STT failed with status:", response.status, "Text:", errorText);
-        throw new Error(`GROQ STT failed: ${errorText}`);
+      console.error("STT ERROR:", await response.text());
+      return new Response("STT failed", { status: 500 });
     }
 
-    const result = await response.json();
-    const text = result?.text || "";
+    const data = await response.json();
 
-    return new Response(JSON.stringify({ text }), {
+    return new Response(JSON.stringify({ text: data.text }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
 
   } catch (error) {
-    console.error("STT error:", error);
-    return new Response(JSON.stringify({ error: error.message || "Unknown STT error" }), { status: 500 });
+    console.error("STT route error:", error);
+    return new Response("Server error", { status: 500 });
   }
-};
+}
