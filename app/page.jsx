@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Heart, MessageCircle, Camera, Mic } from "lucide-react";
+import { Sparkles, Heart, MessageCircle, Camera, Mic, Square } from "lucide-react";
 
 // --- КОНСТАНТЫ ---
 // Начальное сообщение от AI при первом запуске
@@ -26,10 +26,15 @@ export default function NeonGlowAI() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [generatingPhoto, setGeneratingPhoto] = useState(false);
+  const [isRecording, setIsRecording] = useState(false); // Состояние записи
+  
   const audioRef = useRef(null);
   const messagesEndRef = useRef(null);
+  // Рефы для записи
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
-  // Прокрутка вниз при добавлении сообщения
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -46,7 +51,7 @@ export default function NeonGlowAI() {
   // Голосовой ответ (TTS) с использованием локального API
   const speak = useCallback(async (text) => {
     if (!text) return;
-    // ИЗМЕНЕНО: Передаем GENDER вместо VOICE для корректной работы с API
+    // ИЗМЕНЕНО: Передаем GENDER для выбора голоса
     const gender = personality.gender; 
 
     try {
@@ -62,8 +67,10 @@ export default function NeonGlowAI() {
       const audioBlob = await res.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
       
-      audioRef.current.src = audioUrl;
-      audioRef.current.play();
+      if (audioRef.current) {
+        audioRef.current.src = audioUrl;
+        audioRef.current.play();
+      }
 
     } catch (e) {
       console.error("TTS failed:", e);
@@ -71,9 +78,84 @@ export default function NeonGlowAI() {
     }
   }, [personality.gender, personality.nsfw]);
 
+  // --- ЛОГИКА STT (Голосовой ввод) ---
+  const startSpeechToText = async () => {
+    if (loading || generatingPhoto) return;
+
+    if (isRecording) {
+      // 1. Остановка записи
+      mediaRecorderRef.current?.stop();
+      setIsRecording(false);
+      return;
+    }
+
+    try {
+      // 2. Запрос доступа к микрофону
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Используем mimeType для WebM, который лучше всего поддерживается Whisper
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=opus' });
+      
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      // 3. Сбор аудио-частей
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+      
+      // 4. Обработка после остановки
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop()); // Отключаем микрофон
+        
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        
+        if (audioBlob.size === 0) return; 
+
+        setLoading(true);
+        const formData = new FormData();
+        // ВАЖНО: имя поля должно быть 'audio' или 'file' в зависимости от API, 
+        // в app/api/stt/route.js ожидается 'audio'
+        formData.append("audio", audioBlob, "voice_message.webm"); 
+
+        try {
+          const res = await fetch("/api/stt", {
+            method: "POST",
+            body: formData, 
+          });
+
+          if (!res.ok) {
+            const errorData = await res.json().catch(() => ({ error: "STT API failed" }));
+            throw new Error(errorData.error || `STT error: ${res.status}`);
+          }
+          
+          const data = await res.json();
+          const recognizedText = data?.text?.trim();
+
+          if (recognizedText) {
+            setInput(recognizedText); // Помещаем распознанный текст в поле ввода
+          }
+
+        } catch (error) {
+          console.error("STT processing error:", error);
+          setMessages(prev => [...prev, { role: "assistant", content: `Ошибка распознавания: ${error.message}` }]);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      // 5. Запуск записи
+      mediaRecorder.start();
+      setIsRecording(true);
+      
+    } catch (err) {
+      console.error("Microphone access denied:", err);
+      alert("Не удалось получить доступ к микрофону. Проверьте разрешения.");
+    }
+  };
+
   // --- ЛОГИКА ОТПРАВКИ СООБЩЕНИЯ ---
   const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || isRecording) return;
     const userMsg = input.trim();
     
     // 1. Создаём новый массив сообщений, включая текущее (для передачи контекста)
@@ -84,7 +166,6 @@ export default function NeonGlowAI() {
     setInput("");
     setLoading(true);
     
-    // Проверка на секретные команды (если они есть)
     // if (await handleSecretCommand(userMsg)) {
     //   setLoading(false);
     //   return;
@@ -126,6 +207,7 @@ export default function NeonGlowAI() {
     const lastUserMessage = messages.slice().reverse().find(m => m.role === 'user')?.content || "Красивая кибердевушка";
     setGeneratingPhoto(true);
     
+    // Временное сообщение-запрос, чтобы показать действие
     setMessages(prev => [...prev, { role: "user", content: `*Запрос на генерацию фото: ${lastUserMessage}*` }]);
 
     try {
@@ -136,6 +218,7 @@ export default function NeonGlowAI() {
       });
 
       if (!res.ok) {
+        // Пытаемся прочитать ошибку из JSON, если она есть
         const errorData = await res.json().catch(() => ({ error: "Неизвестная ошибка API." }));
         throw new Error(errorData.error || `Ошибка: ${res.status}`);
       }
@@ -161,7 +244,7 @@ export default function NeonGlowAI() {
     }
   };
 
-  // --- ВСПОМОГАТЕЛЬНЫЕ КОМПОНЕНТЫ (для краткости, оставляем как есть) ---
+  // --- ВСПОМОГАТЕЛЬНЫЕ КОМПОНЕНТЫ ---
   const Header = ({ title }) => (
     <motion.header
       initial={{ opacity: 0, y: -20 }}
@@ -195,6 +278,7 @@ export default function NeonGlowAI() {
           {isImage ? (
             <div className="flex flex-col items-center">
               <p className="text-xs italic mb-2 text-white/70">{message.content.replace(/[\[\]]/g, '')}</p>
+              {/* Image tag */}
               <img 
                 src={message.imageUrl} 
                 alt={message.content} 
@@ -212,7 +296,25 @@ export default function NeonGlowAI() {
     );
   };
   
-  // --- ЛОГИКА UI: ШАГИ, ПЕРСОНАЖИ и т.д. (Оставляем без изменений) ---
+  const SetupStep = ({ title, options, onSelect }) => (
+    <div className="p-8 text-center">
+      <h2 className="text-3xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400">{title}</h2>
+      <div className="flex flex-col space-y-4">
+        {options.map((option) => (
+          <motion.button
+            key={option}
+            onClick={() => onSelect(option)}
+            className="px-6 py-3 text-lg font-semibold rounded-lg bg-white/10 hover:bg-white/20 border border-purple-500 hover:border-pink-500 transition-all shadow-neon spotlight-hover"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            {option}
+          </motion.button>
+        ))}
+      </div>
+    </div>
+  );
+  
   const renderStep = () => {
     switch (step) {
       case "welcome":
@@ -288,25 +390,6 @@ export default function NeonGlowAI() {
     }
   };
 
-  const SetupStep = ({ title, options, onSelect }) => (
-    <div className="p-8 text-center">
-      <h2 className="text-3xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400">{title}</h2>
-      <div className="flex flex-col space-y-4">
-        {options.map((option) => (
-          <motion.button
-            key={option}
-            onClick={() => onSelect(option)}
-            className="px-6 py-3 text-lg font-semibold rounded-lg bg-white/10 hover:bg-white/20 border border-purple-500 hover:border-pink-500 transition-all shadow-neon spotlight-hover"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            {option}
-          </motion.button>
-        ))}
-      </div>
-    </div>
-  );
-
   return (
     <div className="min-h-screen w-screen flex flex-col neon-bg">
       <Header title="NEON GLOW AI" />
@@ -325,11 +408,15 @@ export default function NeonGlowAI() {
         >
           {/* STT Button (Mic) */}
           <button 
-            // onClick={startSpeechToText} 
+            onClick={startSpeechToText} 
             disabled={loading || generatingPhoto}
-            className="p-3 md:p-4 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 disabled:opacity-30 pulse-glow spotlight-hover flex items-center justify-center"
+            className={`p-3 md:p-4 rounded-full disabled:opacity-30 pulse-glow spotlight-hover flex items-center justify-center 
+              ${isRecording 
+                ? 'bg-red-500 ring-2 ring-red-300 animate-pulse' 
+                : 'bg-gradient-to-r from-cyan-400 to-blue-500'}`}
           >
-            <Mic className="w-6 h-6 md:w-8 md:h-8" />
+            {/* Иконка меняется с Mic на Square при записи */}
+            {isRecording ? <Square className="w-6 h-6 md:w-8 md:h-8" /> : <Mic className="w-6 h-6 md:w-8 md:h-8" />}
           </button>
           
           <input
@@ -337,8 +424,8 @@ export default function NeonGlowAI() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-            placeholder={loading ? "AI думает..." : "Напиши что-нибудь..."}
-            disabled={loading || generatingPhoto}
+            placeholder={loading ? "AI думает..." : isRecording ? "Идёт запись..." : "Напиши что-нибудь..."}
+            disabled={loading || generatingPhoto || isRecording}
             className="flex-1 px-4 py-3 md:py-4 rounded-full bg-gray-900/80 text-white placeholder-gray-500 border border-purple-500 focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none transition-all"
           />
 
@@ -353,12 +440,12 @@ export default function NeonGlowAI() {
           </button>
           
           {/* Send Button */}
-          <button onClick={sendMessage} disabled={loading || !input.trim()} className="p-3 md:p-4 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 disabled:opacity-30 pulse-glow spotlight-hover flex items-center justify-center">
+          <button onClick={sendMessage} disabled={loading || !input.trim() || isRecording} className="p-3 md:p-4 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 disabled:opacity-30 pulse-glow spotlight-hover flex items-center justify-center">
             <MessageCircle className="w-6 h-6 md:w-8 md:h-8" />
           </button>
           
           {/* Photo Button */}
-          <button onClick={() => generatePhoto()} disabled={generatingPhoto} className="p-3 md:p-4 rounded-full bg-gradient-to-r from-red-600 to-pink-600 disabled:opacity-30 pulse-glow spotlight-hover flex items-center justify-center">
+          <button onClick={() => generatePhoto()} disabled={generatingPhoto || isRecording} className="p-3 md:p-4 rounded-full bg-gradient-to-r from-red-600 to-pink-600 disabled:opacity-30 pulse-glow spotlight-hover flex items-center justify-center">
             {generatingPhoto ? <Sparkles className="w-6 h-6 md:w-8 md:h-8 animate-spin" /> : <Camera className="w-6 h-6 md:w-8 md:h-8" />}
           </button>
         </motion.footer>
