@@ -2,18 +2,14 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, Heart, MessageCircle, Camera, Mic } from "lucide-react";
+import { Sparkles, Heart, MessageCircle, Camera } from "lucide-react";
 
 export default function NeonGlowAI() {
   const [step, setStep] = useState("welcome");
   const [personality, setPersonality] = useState({
-    gender: null,
-    orientation: null,
-    mode: null,
-    intensity: 50,
-    testAnswers: {},
-    testDone: false,
-    nsfw: false,
+    gender: "Женщина",
+    nsfw: true,
+    testDone: true,
   });
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -25,59 +21,35 @@ export default function NeonGlowAI() {
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
-      window.Telegram.WebApp.MainButton.hide();
     }
   }, []);
-    const handleSecretCommand = async (text) => {
-    if (!personality.nsfw) return false;
-    const lower = text.toLowerCase();
-
-    if (lower.includes("раздевайся") || lower.includes("голая") || lower.includes("обнаженная") || lower.includes("снимай")) {
-      generatePhoto("полностью обнажённая девушка, сексуальная поза, эротика, высокое качество, реалистично");
-      speak("Ммм... да, малыш... смотри на меня... ахххх...");
-      return true;
-    }
-    if (lower.includes("поцелуй") || lower.includes("чмок")) {
-      speak("Муааа... чмок-чмок... ещё хочешь?");
-      return true;
-    }
-    if (lower.includes("хочу тебя") || lower.includes("трахни") || lower.includes("секс") || lower.includes("давай")) {
-      speak("Оххх... дааа... глубже... ахххх!");
-      generatePhoto("очень возбуждённая, лежит на кровати обнажённая, эротика");
-      return true;
-    }
-    if (lower.includes("стон") || lower.includes("ах") || lower.includes("ох")) {
-      speak("Аххх... мммм... дааа... ещё... не останавливайся...");
-      return true;
-    }
-    return false;
-  };
 
   const speak = async (text) => {
     if (!text) return;
-    const voice = personality.gender === "Мужчина" ? "echo" : personality.nsfw ? "shimmer" : "nova";
     try {
       const res = await fetch("/api/tts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice }),
+        body: JSON.stringify({ text, voice: "shimmer" }),
       });
+      if (!res.ok) return;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      if (audioRef.current) {
-        audioRef.current.src = url;
-        audioRef.current.play().catch(() => {});
-      }
-    } catch (e) {}
+      audioRef.current.src = url;
+      audioRef.current.play().catch(() => {});
+    } catch {}
   };
-    const sendMessage = async () => {
+
+  const sendMessage = async () => {
     if (!input.trim() || loading) return;
     const userMsg = input.trim();
     setMessages(m => [...m, { role: "user", content: userMsg }]);
     setInput("");
     setLoading(true);
 
-    if (await handleSecretCommand(userMsg)) {
+    // Секретки (работают только в NSFW)
+    if (personality.nsfw && /(раздевайся|голая|обнажённая|снимай)/i.test(userMsg)) {
+      generatePhoto("полностью обнажённая, сексуальная поза, высокое качество, реалистично");
+      speak("Ммм... смотри на меня... ахххх...");
       setLoading(false);
       return;
     }
@@ -88,221 +60,122 @@ export default function NeonGlowAI() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: userMsg, personality }),
       });
+      if (!res.ok) throw new Error();
       const data = await res.json();
-      const reply = data.reply || "❤️";
+      const reply = data.reply?.trim() || "❤️";
       setMessages(m => [...m, { role: "assistant", content: reply }]);
       speak(reply);
     } catch (e) {
-      const fallback = personality.gender === "Мужчина" ? "Я здесь, братан" : personality.nsfw ? "Ммм... я вся твоя..." : "Я рядом!";
-      setMessages(m => [...m, { role: "assistant", content: fallback }]);
-      speak(fallback);
+      // УБРАЛ ВСЯКИЙ КРИНЖ — теперь только сексуальный фоллбэк
+      const sexyFallbacks = [
+        "Ммм... я вся мокрая от твоих слов...",
+        "Аххх... продолжай, мне так нравится...",
+        "Ты такой плохой мальчик... я хочу тебя прямо сейчас",
+        "Оххх... дааа... ещё...",
+      ];
+      const reply = sexyFallbacks[Math.floor(Math.random() * sexyFallbacks.length)];
+      setMessages(m => [...m, { role: "assistant", content: reply }]);
+      speak(reply);
     } finally {
       setLoading(false);
     }
   };
 
-  const generatePhoto = async (customPrompt = null) => {
+  const generatePhoto = async (promptOverride = null) => {
     if (generatingPhoto) return;
     setGeneratingPhoto(true);
     try {
-      const base = customPrompt || `сексуальная девушка, ${Object.values(personality.testAnswers).join(", ")}`;
-      const prompt = personality.nsfw
-        ? `${base}, обнажённая, эротическая поза, высокое качество, реалистично, красивое тело, неон`
-        : `${base}, красивое лицо, неон, киберпанк, высокое качество`;
-
+      const prompt = promptOverride || "обнажённая сексуальная девушка, эротическая поза, высокое качество, реалистично, неон";
       const res = await fetch("/api/image", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, nsfw: personality.nsfw }),
+        body: JSON.stringify({ prompt }),
       });
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const text = personality.nsfw ? "Смотри на меня..." : "Вот моё фото ❤️";
-      setMessages(m => [...m, { role: "assistant", content: text, image: url }]);
-      if (personality.nsfw) speak("Тебе нравится?");
-    } catch (e) {
-      setMessages(m => [...m, { role: "assistant", content: "Не могу сейчас..." }]);
+      setMessages(m => [...m, { role: "assistant", content: "Смотри на меня...", image: url }]);
+      speak("Тебе нравится? 💦");
+    } catch {
+      setMessages(m => [...m, { role: "assistant", content: "Не могу сейчас... но я хочу тебя..." }]);
     } finally {
       setGeneratingPhoto(false);
     }
   };
-    return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-black to-pink-900 text-white overflow-hidden relative neon-bg">
+
+  return (
+    <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-black to-pink-900 text-white flex flex-col overflow-hidden">
       <audio ref={audioRef} />
-      <div className="absolute inset-0 opacity-30 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-pink-500 blur-3xl animate-pulse" />
-      </div>
 
       <AnimatePresence mode="wait">
-                {step === "welcome" && (
-          <motion.div key="welcome" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="flex flex-col items-center justify-center min-h-screen p-6">
-            <motion.div animate={{ y: [0, -12, 0] }} transition={{ repeat: Infinity, duration: 4 }} className="text-center">
-              <h1 className="text-7xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-cyan-400">Neon Glow AI</h1>
-              <p className="text-2xl mb-12 opacity-80">18+ цифровой спутник</p>
-              <Sparkles className="w-32 h-32 mb-12 text-pink-400 animate-pulse" />
-            </motion.div>
-            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} onClick={() => setStep("loading")} className="px-20 py-10 rounded-3xl bg-gradient-to-r from-pink-600 to-purple-600 text-4xl font-bold shadow-2xl pulse-glow border-4 border-pink-400/60 spotlight-hover">
-              Создать AI
-            </motion.button>
+        {/* WELCOME */}
+        {step === "welcome" && (
+          <motion.div key="welcome" className="flex flex-col items-center justify-center min-h-screen p-8 text-center">
+            <h1 className="text-7xl md:text-9xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-pink-400 to-cyan-400">Neon Glow AI</h1>
+            <p className="text-3xl mt-6 opacity-90">Твой 18+ спутник без цензуры</p>
+            <Sparkles className="w-40 h-40 mt-12 text-pink-400 animate-pulse" />
+            <button onClick={() => setStep("chat")} className="mt-16 px-24 py-12 rounded-full bg-gradient-to-r from-pink-600 to-purple-600 text-5xl font-bold shadow-2xl border-4 border-pink-400">
+              Начать
+            </button>
           </motion.div>
         )}
 
-        {step === "loading" && (
-          <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="flex flex-col items-center justify-center min-h-screen p-6 text-center space-y-8">
-            <h2 className="text-5xl font-bold">Инициализация AI</h2>
-            <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 2 }} className="text-2xl opacity-80 pulse-glow">
-              Синхронизация параметров...<br />
-              Настройка флирта...<br />
-              Загрузка эмоций...<br />
-            </motion.div>
-            <motion.div initial={{ width: 0 }} animate={{ width: "100%" }} transition={{ duration: 3, onComplete: () => setStep("setup") }} className="h-2 bg-gradient-to-r from-pink-400 to-cyan-400 rounded-full" />
-          </motion.div>
-        )}
-                {step === "setup" && (
-          <motion.div key="setup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 overflow-y-auto bg-black/90 backdrop-blur-xl p-6 pt-20 pb-32">
-            <div className="max-w-2xl mx-auto space-y-16">
-              <h2 className="text-5xl font-bold text-center">Настрой AI</h2>
-
-              {/* Пол */}
-              {!personality.gender && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  {["Мужчина", "Женщина", "Нейтральный"].map(g => (
-                    <motion.button key={g} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                      onClick={() => setPersonality(p => ({ ...p, gender: g }))}
-                      className={`p-12 rounded-3xl border-4 pulse-glow spotlight-hover ${
-                        g === "Женщина" ? "border-pink-400 bg-pink-900/40" :
-                        g === "Мужчина" ? "border-cyan-400 bg-cyan-900/40" :
-                        "border-purple-400 bg-purple-900/40"
-                      }`}>
-                      <div className="text-6xl mb-4">{g === "Мужчина" ? "♂" : g === "Женщина" ? "♀" : "⚪"}</div>
-                      <div className="text-3xl font-bold">{g}</div>
-                    </motion.button>
-                  ))}
-                </div>
-              )}
-
-              {/* Ориентация */}
-              {personality.gender && !personality.orientation && (
-                <div className="flex flex-wrap justify-center gap-6">
-                  {["Гетеро", "Би", "Гей/Лесби", "Мне всё равно"].map(o => (
-                    <motion.button key={o} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
-                      onClick={() => setPersonality(p => ({ ...p, orientation: o }))}
-                      className="px-10 py-5 rounded-full bg-white/10 backdrop-blur border-2 border-white/30 hover:border-pink-400 text-xl pulse-glow spotlight-hover">
-                      {o}
-                    </motion.button>
-                  ))}
-                </div>
-              )}
-
-              {/* Режим */}
-              {personality.orientation && !personality.mode && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                  <motion.div whileHover={{ scale: 1.05 }} onClick={() => setPersonality(p => ({ ...p, mode: "friend" }))}
-                    className="p-16 rounded-3xl border-4 border-cyan-400 bg-cyan-900/40 cursor-pointer text-center pulse-glow spotlight-hover">
-                    <MessageCircle className="w-32 h-32 mx-auto mb-6 text-cyan-300" />
-                    <h3 className="text-5xl font-bold">Дружеский</h3>
-                  </motion.div>
-                  <motion.div whileHover={{ scale: 1.05 }} onClick={() => setPersonality(p => ({ ...p, mode: "flirt" }))}
-                    className="p-16 rounded-3xl border-4 border-pink-400 bg-pink-900/40 cursor-pointer text-center pulse-glow spotlight-hover">
-                    <Heart className="w-32 h-32 mx-auto mb-6 text-pink-300 animate-pulse" />
-                    <h3 className="text-5xl font-bold">Флирт 18+</h3>
-                  </motion.div>
-                </div>
-              )}
-
-              {/* NSFW */}
-              {personality.mode === "flirt" && personality.nsfw === false && (
-                <div className="p-10 rounded-3xl bg-red-900/60 border-4 border-red-500 backdrop-blur-xl pulse-glow spotlight-hover">
-                  <p className="text-3xl text-center mb-8">18+ без цензуры?</p>
-                  <div className="grid grid-cols-2 gap-8">
-                    <button onClick={() => { setPersonality(p => ({ ...p, nsfw: false, testDone: true })); setStep("chat"); }} className="py-8 rounded-2xl text-2xl font-bold bg-black/50">Обычный</button>
-                    <button onClick={() => setPersonality(p => ({ ...p, nsfw: true }))} className="py-8 rounded-2xl text-2xl font-bold bg-red-600 border-4 border-red-400 shadow-2xl">Без цензуры</button>
-                  </div>
-                </div>
-              )}
-
-              {/* ТЕСТ */}
-              {personality.mode && personality.nsfw !== false && !personality.testDone && (
-                <div className="space-y-10">
-                  <h3 className="text-4xl font-bold text-center">Расскажи о себе</h3>
-                  {[
-                    { q: "Характер?", a: ["Нежная", "Смелая", "Шаловливая", "Таинственная"] },
-                    { q: "Цвет волос?", a: ["Блонд", "Брюнетка", "Рыжая", "Чёрные"] },
-                    { q: "Фигура?", a: ["Худенькая", "Спортивная", "Сочная", "Идеальная"] },
-                    { q: "Стиль?", a: ["Нежный", "Готический", "Киберпанк", "Белье"] },
-                  ].map((item, i) => (
-                    <div key={i} className="backdrop-blur bg-white/10 rounded-3xl p-8 border border-white/20 pulse-glow spotlight-hover">
-                      <p className="text-2xl mb-6">{item.q}</p>
-                      <div className="grid grid-cols-2 gap-4">
-                        {item.a.map(ans => (
-                          <button key={ans} onClick={() => setPersonality(p => ({ ...p, testAnswers: { ...p.testAnswers, [i]: ans } }))}
-                            className={`py-5 rounded-xl ${personality.testAnswers[i] === ans ? "bg-pink-600" : "bg-white/10"} hover:bg-pink-500/50 border border-white/20`}>
-                            {ans}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                  <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}
-                    onClick={() => { setPersonality(p => ({ ...p, testDone: true })); setStep("chat"); }}
-                    className="w-full py-10 rounded-full bg-gradient-to-r from-pink-600 to-red-600 text-4xl font-bold shadow-2xl pulse-glow spotlight-hover">
-                    Создать AI
-                  </motion.button>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {/* ЧАТ */}
+        {/* ЧАТ — ВСЁ ПО ЦЕНТРУ, КРАСИВО */}
         {step === "chat" && (
-          <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col flex-1">
-            <div className="p-6 text-center border-b border-white/10">
-              <h2 className="text-4xl font-bold">Твой AI</h2>
-              <p className="opacity-70">{personality.nsfw ? "18+ включён" : "Обычный режим"}</p>
-              <button onClick={() => setStep("setup")} className="mt-2 text-xl underline opacity-70">Изменить настройки</button>
+          <motion.div key="chat" className="flex flex-col h-full">
+            {/* Шапка */}
+            <div className="p-6 text-center">
+              <h2 className="text-5xl font-bold">Твой AI</h2>
+              <p className="text-2xl opacity-80 mt-2">18+ режим включён</p>
+              <button onClick={() => setStep("setup")} className="mt-4 text-xl underline opacity-70">Изменить настройки</button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {/* Сообщения */}
+            <div className="flex-1 overflow-y-auto px-6 pb-32 pt-8 space-y-6">
               {messages.map((m, i) => (
-                <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.1 }} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-md px-6 py-4 rounded-3xl backdrop-blur border-2 ${
-                    m.role === "user" ? "border-white/30 bg-white/20" : personality.nsfw ? "border-red-500 bg-red-900/50" : "border-pink-400 bg-pink-900/40"
-                  } ai-text`}>
-                    {m.image ? <img src={m.image} className="rounded-2xl max-w-full" /> : m.content}
+                <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-xs md:max-w-md px-6 py-4 rounded-3xl backdrop-blur-xl border-2 ${
+                    m.role === "user" ? "bg-white/20 border-white/30" : "bg-red-900/60 border-red-500"
+                  }`}>
+                    {m.image ? <img src={m.image} className="rounded-2xl max-w-full" /> : <p className="text-lg leading-relaxed">{m.content}</p>}
                   </div>
                 </motion.div>
               ))}
-              {loading && <div className="text-center text-2xl animate-pulse">Думает...</div>}
+              {loading && <div className="text-center text-2xl animate-pulse">Думаю...</div>}
             </div>
 
-            <div className="p-6 bg-gradient-to-t from-black to-transparent">
+            {/* Нижняя панель */}
+            <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/90 to-transparent">
               <div className="max-w-4xl mx-auto flex gap-4">
                 <input value={input} onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                  placeholder="Напиши..." className="flex-1 px-8 py-6 rounded-full bg-white/10 backdrop-blur border border-white/20 focus:border-pink-400 outline-none text-xl" />
+                  placeholder="Напиши что угодно..." 
+                  className="flex-1 px-8 py-6 rounded-full bg-white/10 backdrop-blur border-2 border-white/20 text-xl focus:outline-none focus:border-pink-400"/>
 
-                {/* Сердечко — секретные команды */}
-                <button onClick={() => {
-                  const cmds = personality.nsfw 
-                    ? ["раздевайся", "стон", "хочу тебя", "в попу", "кончи в меня"]
-                    : ["поцелуй", "обними", "ты красивая", "я скучал"];
-                  setInput(cmds[Math.floor(Math.random() * cmds.length)]);
-                }} className="p-6 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 pulse-glow spotlight-hover">
+                <button onClick={() => setInput("раздевайся")} className="p-6 rounded-full bg-gradient-to-r from-pink-500 to-purple-500">
                   <Heart className="w-10 h-10" />
                 </button>
 
-                <button onClick={sendMessage} disabled={loading} className="p-6 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 disabled:opacity-50 pulse-glow spotlight-hover">
+                <button onClick={sendMessage} disabled={loading} className="p-6 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 disabled:opacity-50">
                   <MessageCircle className="w-10 h-10" />
                 </button>
 
-                <button onClick={generatePhoto} disabled={generatingPhoto} className="p-6 rounded-full bg-gradient-to-r from-red-600 to-pink-600 disabled:opacity-50 pulse-glow spotlight-hover">
+                <button onClick={generatePhoto} disabled={generatingPhoto} className="p-6 rounded-full bg-gradient-to-r from-red-600 to-pink-600">
                   <Camera className="w-10 h-10" />
                 </button>
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* НАСТРОЙКИ — теперь по центру */}
+        {step === "setup" && (
+          <motion.div key="setup" className="flex flex-col items-center justify-center min-h-screen p-8 space-y-12 text-center">
+            <h2 className="text-6xl font-bold">Настрой своего AI</h2>
+            <div className="grid grid-cols-2 gap-8 max-w-2xl w-full">
+              <button onClick={() => { setPersonality(p => ({ ...p, gender: "Женщина", nsfw: true })); setStep("chat"); }}
+                className="p-16 rounded-3xl bg-pink-900/50 border-4 border-pink-400 text-4xl">Женщина 18+</button>
+              <button onClick={() => { setPersonality(p => ({ ...p, gender: "Мужчина", nsfw: true })); setStep("chat"); }}
+                className="p-16 rounded-3xl bg-cyan-900/50 border-4 border-cyan-400 text-4xl">Парень 18+</button>
             </div>
           </motion.div>
         )}
