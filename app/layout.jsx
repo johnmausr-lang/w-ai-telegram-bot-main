@@ -6,7 +6,6 @@ export const metadata = {
   description: "Твой 18+ цифровой спутник",
 };
 
-// Использование 'dvh' для корректной работы на мобильных устройствах/Telegram
 export const viewport = {
   width: "device-width",
   initialScale: 1,
@@ -20,12 +19,9 @@ export default function RootLayout({ children }) {
     <html lang="ru">
       <head>
         <meta name="theme-color" content="#000000" />
-        {/* Добавляем скрипт Telegram WebApp */}
-        <script src="https://telegram.org/js/telegram-web-app.js"></script>
         <link rel="manifest" href="/manifest.json" />
       </head>
-      {/* ИСПРАВЛЕНИЕ: min-h-dvh для корректной высоты на мобильных */}
-      <body className="min-h-dvh w-screen overflow-hidden bg-black text-white antialiased">
+      <body className="min-h-screen w-screen overflow-hidden bg-black text-white antialiased flex flex-col">
         {children}
       </body>
     </html>
