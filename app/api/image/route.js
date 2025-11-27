@@ -1,4 +1,4 @@
-// Файл: app/api/image/route.js
+// Файл: app/api/image/route.js (Replicate - Stable Diffusion)
 const REPLICATE_API_URL = "https://api.replicate.com/v1/predictions";
 
 export const POST = async (req) => {
@@ -10,12 +10,11 @@ export const POST = async (req) => {
       return new Response("Prompt or API Token is missing", { status: 400 });
     }
 
-    // ИСПРАВЛЕНИЕ: Используем бесцензурные промпты для NSFW-моделей
+    // Использование бесцензурных промптов для NSFW-моделей
     const positivePrompt = nsfw
       ? `A highly detailed, realistic photo of a fully nude woman, extremely seductive pose, volumetric lighting, erotic, cyberpunk style, neon glow. The woman's appearance matches: ${prompt}`
       : `A photorealistic portrait, beautiful face, soft neon lighting, cyberpunk aesthetic, high quality, 8k. The person's appearance matches: ${prompt}`;
     
-    // Отрицательный промпт - ключевой для качества Stable Diffusion
     const negativePrompt = "worst quality, low quality, illustration, 3d, 2d, painting, sketch, drawing, extra limbs, deformed, censored, text, signature";
 
     // 1. Запуск генерации (Создание prediction)
@@ -26,8 +25,8 @@ export const POST = async (req) => {
         "Authorization": `Token ${REPLICATE_API_TOKEN}`,
       },
       body: JSON.stringify({
-        // Выбираем мощную NSFW-совместимую модель (например, SDXL)
-        version: "c6a2372b14619d80d19f1870a4409549f7e6f9a65d1d6428c0499e69c0540d6c", // Версия SDXL
+        // SDXL версия, которая хорошо работает с NSFW (при правильном промпте)
+        version: "c6a2372b14619d80d19f1870a4409549f7e6f9a65d1d6428c0499e69c0540d6c", 
         input: {
           prompt: positivePrompt,
           negative_prompt: negativePrompt,
@@ -46,12 +45,12 @@ export const POST = async (req) => {
 
     if (prediction.error) throw new Error(prediction.error);
     
-    // 2. Опрос статуса (Polling)
+    // 2. Опрос статуса (Polling - Ждём завершения)
     let outputUrl = null;
     let status = prediction.status;
 
     while (status !== "succeeded" && status !== "failed") {
-      await new Promise(resolve => setTimeout(resolve, 3000)); // Ждем 3 секунды
+      await new Promise(resolve => setTimeout(resolve, 3000)); 
       const pollResponse = await fetch(`${REPLICATE_API_URL}/${predictionId}`, {
         headers: { "Authorization": `Token ${REPLICATE_API_TOKEN}` }
       });
@@ -73,12 +72,8 @@ export const POST = async (req) => {
     const imageResponse = await fetch(outputUrl);
     if (!imageResponse.ok) throw new Error("Failed to fetch generated image.");
 
-    // Возвращаем изображение как Response с правильным заголовком
     return new Response(imageResponse.body, {
-      headers: { 
-        "Content-Type": "image/jpeg", // Replicate часто возвращает JPEG
-        "Cache-Control": "no-store"
-      },
+      headers: { "Content-Type": "image/jpeg" },
     });
 
   } catch (error) {
