@@ -1,7 +1,7 @@
-// Файл: page.jsx
+// Файл: page.jsx (Исправленная и дополненная версия)
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Heart, MessageCircle, Camera, Mic, Volume2, StopCircle } from "lucide-react";
 
@@ -21,16 +21,16 @@ export default function NeonGlowAI() {
   const [loading, setLoading] = useState(false);
   const [generatingPhoto, setGeneratingPhoto] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false); 
-  const [isRecording, setIsRecording] = useState(false); // НОВОЕ: Состояние записи
+  const [isRecording, setIsRecording] = useState(false); // Состояние записи
   const audioRef = useRef(null);
   const messagesEndRef = useRef(null); 
   
-  // НОВОЕ: Переменные для записи голоса
+  // НОВЫЕ: Переменные для записи голоса
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
+  // Эффекты
   useEffect(() => {
-    // Инициализация Telegram WebApp
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
@@ -40,7 +40,7 @@ export default function NeonGlowAI() {
     }
   }, []);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isRecording, loading]);
   
   useEffect(() => {
     const audio = audioRef.current;
@@ -51,22 +51,19 @@ export default function NeonGlowAI() {
 
 
   // БЛОК 2 — Функция синтеза речи (ElevenLabs)
-  const speak = async (text) => {
+  const speak = useCallback(async (text) => {
     if (!text || isSpeaking) return;
-
-    // Выбираем ElevenLabs Voice ID (Замени на свои!)
-    const voiceId = personality.gender === "Мужчина"
-      ? "voice_id_for_male" // ID мужского голоса
-      : personality.nsfw ? "voice_id_for_nsfw_female" : "voice_id_for_friendly_female"; // ID женского/nsfw голоса
+    
+    // ElevenLabs API использует gender для выбора голоса
+    const gender = personality.gender; 
       
     setIsSpeaking(true);
     
     try {
-      // ИСПРАВЛЕНИЕ: Путь к API корректен для App Router, используется ElevenLabs
       const res = await fetch("/api/tts", { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voiceId }),
+        body: JSON.stringify({ text, gender }),
       });
       
       if (!res.ok) {
@@ -87,11 +84,11 @@ export default function NeonGlowAI() {
       console.error("TTS error:", e);
       setIsSpeaking(false);
     }
-  };
+  }, [isSpeaking, personality.gender]);
 
 
   // БЛОК 3 — Генерация фото (Replicate)
-  const generatePhoto = async (customPrompt = null) => {
+  const generatePhoto = useCallback(async (customPrompt = null) => {
     if (generatingPhoto) return;
     setGeneratingPhoto(true);
     
@@ -103,7 +100,6 @@ export default function NeonGlowAI() {
     const finalPrompt = customPrompt || base;
     
     try {
-      // ИСПРАВЛЕНИЕ: Используется Replicate API
       const res = await fetch("/api/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -128,14 +124,84 @@ export default function NeonGlowAI() {
     } finally {
       setGeneratingPhoto(false);
     }
-  };
+  }, [generatingPhoto, personality.testAnswers, personality.gender, personality.nsfw, speak]);
+
+  
+  // БЛОК 4 — Секретные команды (ИСПРАВЛЕНА: перемещена внутрь компонента)
+  const handleSecretCommand = useCallback(async (text) => {
+    if (!personality.nsfw) return false;
+    const lower = text.toLowerCase();
+    const secrets = {
+      "раздевайся|голая|обнаженная|снимай": () => {
+        generatePhoto("полностью обнажённая девушка, сексуальная поза, высокое качество, реалистично");
+        speak("Ммм... да, малыш... смотри на меня... ахххх...");
+      },
+      "поцелуй|чмок": () => speak("Муааа... чмок-чмок... ещё хочешь?"),
+      "хочу тебя|трахни|секс|давай": () => {
+        speak("Оххх... дааа... глубже... ахххх!");
+        generatePhoto("очень возбуждённая, лежит на кровати обнажённая, эротика");
+      },
+      "стон|ах|ох|ммм": () => speak("Аххх... мммм... дааа... ещё... не останавливайся..."),
+      "на колени|отсоси|в рот": () => {
+        speak("Даа... бери в ротик... глубже...");
+        generatePhoto("на коленях, рот открыт, эротика");
+      },
+      "кончи|сперма|кончил": () => {
+        speak("Дааа... заливай меня... я вся твоя...");
+        generatePhoto("сперма на лице, очень возбуждённая, эротика");
+      },
+      "фото|покажи себя": () => {
+          generatePhoto();
+          speak("Тебе нравится? 😏");
+      }
+    };
+    for (const [keys, action] of Object.entries(secrets)) {
+      if (keys.split("|").some(k => lower.includes(k))) {
+        action();
+        return true;
+      }
+    }
+    return false;
+  }, [personality.nsfw, generatePhoto, speak]);
 
 
-  // БЛОК 4 — Функции записи голоса (STT)
-  const startRecording = async () => {
+  // БЛОК 5 — Функции записи голоса (STT)
+  const sendAudioToSTT = useCallback(async (audioBlob) => {
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'voice_message.webm');
+      
+      const res = await fetch('/api/stt', {
+        method: 'POST',
+        body: formData, 
+      });
+
+      if (!res.ok) throw new Error('STT failed');
+
+      const data = await res.json();
+      const transcribedText = data.text;
+
+      if (transcribedText) {
+        await sendMessage(transcribedText); // Отправляем распознанный текст
+      } else {
+        setMessages(m => [...m, { role: "assistant", content: "Не удалось распознать речь." }]);
+      }
+      
+    } catch (error) {
+      console.error('STT API error:', error);
+      setMessages(m => [...m, { role: "assistant", content: "Ошибка распознавания речи." }]);
+    } finally {
+      setLoading(false);
+    }
+  }, [personality, sendMessage]);
+
+
+  const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' }); // Формат для GROQ/Whisper
+      // Используем формат webm, который лучше всего поддерживается Whisper
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' }); 
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -150,56 +216,24 @@ export default function NeonGlowAI() {
 
       mediaRecorder.start();
       setIsRecording(true);
+      setMessages(m => [...m, { role: "assistant", content: "Началась запись голоса..." }]);
     } catch (err) {
       console.error('Error starting recording:', err);
-      alert('Не удалось получить доступ к микрофону. Проверьте разрешения.');
+      setMessages(m => [...m, { role: "assistant", content: "Не удалось получить доступ к микрофону." }]);
       setIsRecording(false);
     }
-  };
+  }, [sendAudioToSTT]);
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      // Логика sendAudioToSTT вызывается в mediaRecorder.onstop
     }
   };
 
-  const sendAudioToSTT = async (audioBlob) => {
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'voice_message.webm');
-      
-      // ИСПРАВЛЕНИЕ: Используется новый GROQ STT API
-      const res = await fetch('/api/stt', {
-        method: 'POST',
-        body: formData, // FormData отправляется напрямую
-      });
 
-      if (!res.ok) throw new Error('STT failed');
-
-      const data = await res.json();
-      const transcribedText = data.text;
-
-      if (transcribedText) {
-        setInput(transcribedText); // Вставляем распознанный текст в инпут
-        await sendMessage(transcribedText); // И отправляем его
-      } else {
-        alert("Не удалось распознать речь. Попробуйте еще раз.");
-      }
-      
-    } catch (error) {
-      console.error('STT API error:', error);
-      alert("Ошибка распознавания речи.");
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-
-  // БЛОК 5 — Отправка сообщения
-  const sendMessage = async (customInput = null) => {
+  // БЛОК 6 — Отправка сообщения
+  const sendMessage = useCallback(async (customInput = null) => {
     const userMsg = (customInput || input).trim();
     if (!userMsg || loading) return;
     
@@ -215,7 +249,6 @@ export default function NeonGlowAI() {
     }
 
     try {
-      // ИСПРАВЛЕНИЕ: Используется Horde Chat API
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -239,19 +272,10 @@ export default function NeonGlowAI() {
     } finally {
       setLoading(false);
     }
-  };
-  
-  // БЛОК 6 — Функции для UI (Кнопка "Сердце")
-  const handleRandomCommand = () => {
-    const cmds = personality.nsfw
-        ? ["фото", "раздевайся", "стон", "хочу тебя", "на колени", "кончи"]
-        : (personality.gender === "Мужчина" 
-            ? ["расскажи шутку", "как дела?", "ты крутой", "обними"]
-            : ["расскажи шутку", "как дела?", "ты красивая", "обними"]);
-    setInput(cmds[Math.floor(Math.random() * cmds.length)]); 
-  };
-  
-  // БЛОК 7 — Рендеринг (тот же, что и раньше, но с фиксом записи)
+  }, [input, loading, personality, handleSecretCommand, speak]);
+
+
+  // БЛОК 7 — UI (Рендеринг)
   return (
     <div className="fixed inset-0 w-[100vw] min-h-[100dvh] bg-gradient-to-br from-purple-900 via-black to-pink-900 text-white flex flex-col">
       <audio ref={audioRef} />
@@ -386,7 +410,7 @@ export default function NeonGlowAI() {
                 </button>
                 <h2 className="text-4xl font-bold">Твой AI</h2>
                 <div className="w-16 flex justify-end">
-                    <button onClick={() => audioRef.current.src && audioRef.current.play()} disabled={isSpeaking} className={`p-2 rounded-full transition ${isSpeaking ? 'bg-pink-600 animate-pulse' : 'bg-white/10'}`}>
+                    <button onClick={() => audioRef.current?.src && audioRef.current.play()} disabled={isSpeaking} className={`p-2 rounded-full transition ${isSpeaking ? 'bg-pink-600 animate-pulse' : 'bg-white/10'}`}>
                         <Volume2 className="w-6 h-6" />
                     </button>
                 </div>
@@ -420,12 +444,17 @@ export default function NeonGlowAI() {
                     placeholder="Напиши что-нибудь..." className="flex-1 px-4 py-3 rounded-full bg-white/10 backdrop-blur-xl border-2 border-white/20 text-xl focus:outline-none focus:border-pink-400"/>
                   
                   {/* Кнопка "Сердце" (Команды/Секреты) */}
-                  <button onClick={handleRandomCommand} disabled={loading || isRecording} className="p-3 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 hover:scale-105 transition disabled:opacity-50" title="Вставить случайную команду/секрет">
+                  <button onClick={() => {
+                      const cmds = personality.nsfw
+                       ? ["раздевайся", "стон", "хочу тебя"]
+                      : ["расскажи шутку", "как дела?", "обними"];
+                    setInput(cmds[Math.floor(Math.random() * cmds.length)]);
+                  }} disabled={loading || isRecording} className="p-3 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 hover:scale-105 transition disabled:opacity-50" title="Вставить случайную команду/секрет">
                     <Heart className="w-6 h-6" />
                   </button>
                   
                   {/* Кнопка "Камера" для фото */}
-                  <button onClick={generatePhoto} disabled={generatingPhoto || loading || isRecording} className="p-3 rounded-full bg-gradient-to-r from-red-600 to-pink-600 disabled:opacity-50 hover:scale-105 transition" title="Сгенерировать фото">
+                  <button onClick={() => generatePhoto()} disabled={generatingPhoto || loading || isRecording} className="p-3 rounded-full bg-gradient-to-r from-red-600 to-pink-600 disabled:opacity-50 hover:scale-105 transition" title="Сгенерировать фото">
                     <Camera className="w-6 h-6" />
                   </button>
                   
