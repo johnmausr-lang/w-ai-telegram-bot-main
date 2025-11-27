@@ -1,50 +1,43 @@
-// app/api/tts/route.js
-const VOICES = {
-  nova:    "21m00Tcm4TlvDq8ikWAM", // мягкий женский (по умолчанию)
-  shimmer: "EXrN9tFqE6dYg3rX227N", // сексуальный/дыхательный женский
-  echo:    "pNqPqEChMhB3lW9Jj5jF", // мужской
-};
+export const runtime = "edge";
 
-export const POST = async (req) => {
+export async function POST(req) {
   try {
     const { text, voice = "nova" } = await req.json();
-    const key = process.env.ELEVENLABS_API_KEY;
 
-    if (!key) return new Response("ElevenLabs key missing", { status: 500 });
-    if (!text?.trim()) return new Response("No text", { status: 400 });
+    if (!text || text.trim().length === 0) {
+      return new Response("No text provided", { status: 400 });
+    }
 
-    const voiceId = VOICES[voice] || VOICES.nova;
-
-    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`, {
+    const response = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: {
-        "xi-api-key": key,
         "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        text: text.slice(0, 4000),
-        model_id: "eleven_multilingual_v2",
-        voice_settings: {
-          stability: 0.65,
-          similarity_boost: 0.85,
-          style: voice === "shimmer" ? 0.9 : 0.5, // больше экспрессии для NSFW
-        },
+        model: "gpt-4o-mini-tts",
+        voice,
+        input: text,
+        format: "mp3",
       }),
     });
 
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(err);
+    if (!response.ok) {
+      console.error("TTS ERROR:", await response.text());
+      return new Response("TTS failed", { status: 500 });
     }
 
-    return new Response(res.body, {
+    const audioBuffer = await response.arrayBuffer();
+
+    return new Response(audioBuffer, {
+      status: 200,
       headers: {
         "Content-Type": "audio/mpeg",
-        "Cache-Control": "no-cache",
       },
     });
-  } catch (e) {
-    console.error("TTS Error:", e);
-    return new Response("TTS failed", { status: 500 });
+
+  } catch (error) {
+    console.error("TTS route error:", error);
+    return new Response("Server error", { status: 500 });
   }
-};
+}
