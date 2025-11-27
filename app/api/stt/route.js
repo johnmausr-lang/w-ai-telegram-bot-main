@@ -6,7 +6,7 @@ export const POST = async (req) => {
     const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
     if (!GROQ_API_KEY) {
-      return new Response("GROQ API Key is missing", { status: 400 });
+      return new Response(JSON.stringify({ error: "GROQ API Key is missing" }), { status: 500 });
     }
     
     const formData = new FormData();
@@ -14,14 +14,14 @@ export const POST = async (req) => {
     const audioFile = body.get('audio');
     
     if (!audioFile) {
-        return new Response("Audio file not provided", { status: 400 });
+        return new Response(JSON.stringify({ error: "Audio file not provided" }), { status: 400 });
     }
     
     // Передаём файл в виде Blob или File
     formData.append("file", audioFile, "voice_message.webm");
     formData.append("model", "whisper-large-v3");
     formData.append("response_format", "json");
-    formData.append("language", "ru"); 
+    formData.append("language", "ru"); // Указываем русский язык для лучшего качества
 
     const response = await fetch(GROQ_WHISPER_URL, {
         method: "POST",
@@ -33,6 +33,8 @@ export const POST = async (req) => {
 
     if (!response.ok) {
         const errorText = await response.text();
+        // Улучшенное логирование ошибки
+        console.error("GROQ STT failed with status:", response.status, "Text:", errorText);
         throw new Error(`GROQ STT failed: ${errorText}`);
     }
 
@@ -45,10 +47,7 @@ export const POST = async (req) => {
     });
 
   } catch (error) {
-    console.error("STT API error:", error);
-    return new Response(JSON.stringify({ error: "STT failed" }), { 
-      status: 500,
-      headers: { "Content-Type": "application/json" }
-    });
+    console.error("STT error:", error);
+    return new Response(JSON.stringify({ error: error.message || "Unknown STT error" }), { status: 500 });
   }
 };
