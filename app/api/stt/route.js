@@ -1,4 +1,4 @@
-// Файл: app/api/stt/route.js
+// Файл: app/api/stt/route.js (GROQ Whisper API)
 const GROQ_WHISPER_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 
 export const POST = async (req) => {
@@ -9,11 +9,7 @@ export const POST = async (req) => {
       return new Response("GROQ API Key is missing", { status: 400 });
     }
     
-    // 1. Создаем объект FormData для отправки файла
     const formData = new FormData();
-    // Vercel/Next.js Body is a readable stream. 
-    // Мы ожидаем, что клиент (page.jsx) отправит FormData с аудиофайлом.
-    
     const body = await req.formData();
     const audioFile = body.get('audio');
     
@@ -21,25 +17,23 @@ export const POST = async (req) => {
         return new Response("Audio file not provided", { status: 400 });
     }
     
-    formData.append("file", audioFile, "audio.webm");
+    // Передаём файл в виде Blob или File
+    formData.append("file", audioFile, "voice_message.webm");
     formData.append("model", "whisper-large-v3");
     formData.append("response_format", "json");
-    formData.append("language", "ru"); // Указываем русский язык для точности
+    formData.append("language", "ru"); 
 
-    // 2. Отправляем запрос к GROQ
     const response = await fetch(GROQ_WHISPER_URL, {
         method: "POST",
         headers: {
             "Authorization": `Bearer ${GROQ_API_KEY}`,
         },
-        // FormData будет содержать Content-Type: multipart/form-data
         body: formData,
     });
 
     if (!response.ok) {
         const errorText = await response.text();
-        console.error("GROQ STT error:", errorText);
-        throw new Error(`GROQ STT failed with status ${response.status}`);
+        throw new Error(`GROQ STT failed: ${errorText}`);
     }
 
     const result = await response.json();
