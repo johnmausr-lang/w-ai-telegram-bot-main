@@ -4,17 +4,13 @@ export async function POST(req) {
   try {
     const { prompt, personality } = await req.json();
 
-    let style = "high quality, soft neon, cinematic lighting, beautiful face";
-    let nsfwAddition = "";
-
-    // ЛЁГКИЙ флирт, безопасный
-    if (personality?.nsfw) {
-      nsfwAddition = ", sensual atmosphere, close-up portrait, soft skin glow";
+    if (!process.env.OPENROUTER_API_KEY) {
+      return new Response("No OPENROUTER_API_KEY", { status: 500 });
     }
 
-    // Итоговый промпт
     const finalPrompt = `
-Portrait, ultra quality, ${style} ${nsfwAddition}.
+portrait, neon glow, cinematic, high detail.
+${personality?.nsfw ? "soft sensual lighting" : ""}
 ${prompt}
 `;
 
@@ -27,29 +23,27 @@ ${prompt}
       body: JSON.stringify({
         model: "black-forest-labs/FLUX.1-dev",
         prompt: finalPrompt,
-        size: "768x512",
-        output_format: "base64",
+        size: "512x768",
+        output_format: "base64"
       }),
     });
 
     if (!response.ok) {
-      return new Response(
-        JSON.stringify({ error: "Image generation failed" }),
-        { status: 500 }
-      );
+      const err = await response.text();
+      console.error("IMG ERROR:", err);
+      return new Response(JSON.stringify({ error: "ImageError" }), { status: 500 });
     }
 
     const data = await response.json();
 
-    return new Response(
-      JSON.stringify({ image: data?.data?.[0]?.b64_json }),
-      { status: 200 }
-    );
+    return new Response(JSON.stringify({
+      image: data?.data?.[0]?.b64_json || null
+    }), { status: 200 });
+
   } catch (error) {
-    console.error("IMAGE ERROR:", error);
-    return new Response(
-      JSON.stringify({ error: "Server error" }),
-      { status: 500 }
-    );
+    console.error("IMAGE route error:", error);
+    return new Response(JSON.stringify({ error: "ImageError" }), {
+      status: 500,
+    });
   }
 }
