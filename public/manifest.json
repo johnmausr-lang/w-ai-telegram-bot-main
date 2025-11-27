@@ -1,6 +1,6 @@
 {
-  "name": "W-AI Telegram",
-  "short_name": "WAI",
+  "name": "W AI Assistant",
+  "short_name": "AI Bot",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1A0033",
