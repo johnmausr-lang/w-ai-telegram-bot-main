@@ -1,7 +1,7 @@
 // app/layout.jsx
 export const metadata = {
   title: "Neon Glow AI Pro",
-  description: "Next-Gen AI Companion 2025",
+  description: "Next-Generation AI Companion 2025"
 };
 
 export const dynamic = "force-dynamic";
@@ -16,9 +16,11 @@ export default function RootLayout({ children }) {
         style={{
           margin: 0,
           padding: 0,
-          background: "black",
-          color: "white",
+          background: "#000",
+          color: "#fff",
+          maxWidth: "100vw",
           overflowX: "hidden",
+          fontFamily: "-apple-system, Inter, sans-serif",
         }}
       >
         {children}
