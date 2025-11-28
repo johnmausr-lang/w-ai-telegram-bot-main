@@ -1,18 +1,33 @@
 import OpenAI from "openai";
 
-export const runtime = "nodejs";
-
 export async function POST(req) {
-  const { prompt } = await req.json();
+  try {
+    const { prompt } = await req.json();
 
-  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
 
-  const img = await client.images.generate({
-    model: "gpt-image-1",
-    prompt,
-    size: "512x512",
-    response_format: "b64_json",
-  });
+    const result = await openai.images.generate({
+      model: "gpt-image-1",
+      size: "512x512",
+      prompt,
+      response_format: "b64_json",
+    });
 
-  return Response.json({ image: img.data[0].b64_json });
+    const imageB64 = result.data[0].b64_json;
+
+    return new Response(
+      JSON.stringify({ image: imageB64 }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+
+  } catch (err) {
+    console.error("IMAGE API ERROR:", err);
+
+    return new Response(
+      JSON.stringify({ error: "Failed to generate image" }),
+      { status: 500 }
+    );
+  }
 }
