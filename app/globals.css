@@ -1,0 +1,63 @@
+/* app/globals.css */
+
+/* —————————————————————————————— */
+/*   Глобальные переменные тем     */
+/* —————————————————————————————— */
+:root {
+  --primary: #ff2ea6;
+  --glow: rgba(255, 46, 166, 0.55);
+  --bg-main: #000000;
+  --text-main: #ffffff;
+}
+
+/* —————————————————————————————— */
+/*   Сброс стилей                  */
+/* —————————————————————————————— */
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+  background: var(--bg-main);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 4px;
+}
+
+/* —————————————————————————————— */
+/*   Красивое затемнение           */
+/* —————————————————————————————— */
+.blur-glass {
+  backdrop-filter: blur(18px);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 22px;
+  padding: 16px;
+}
+
+/* —————————————————————————————— */
+/*   Анимации                      */
+/* —————————————————————————————— */
+@keyframes neonGlow {
+  0% { box-shadow: 0 0 12px var(--glow); }
+  50% { box-shadow: 0 0 22px var(--glow); }
+  100% { box-shadow: 0 0 12px var(--glow); }
+}
+
+.neon-animated {
+  animation: neonGlow 2.5s infinite ease-in-out;
+}
