@@ -1,5 +1,5 @@
-// app/api/chat/route.js  ← 100% рабочий Zephyr-7B-beta (мгновенно + максимально горячо)
-const HF_API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta";
+// app/api/chat/route.js  ← ФИНАЛЬНАЯ ВЕРСИЯ: HF Router + Zephyr (бесплатно, без цензуры, мгновенно)
+const HF_API_URL = "https://router.huggingface.co/hf-inference/models/HuggingFaceH4/zephyr-7b-beta";
 
 export const POST = async (req) => {
   try {
@@ -7,7 +7,11 @@ export const POST = async (req) => {
     const token = process.env.HUGGINGFACE_API_TOKEN;
 
     if (!token) {
-      return new Response(JSON.stringify({ reply: "Ой, я потерялась… попробуй ещё ❤️" }), { status: 200 });
+      console.error("HUGGINGFACE_API_TOKEN missing in Vercel env");
+      return new Response(JSON.stringify({ reply: "Ой, я потерялась… попробуй ещё ❤️" }), { 
+        status: 200, 
+        headers: { "Content-Type": "application/json" } 
+      });
     }
 
     const isNSFW = personality?.nsfw || false;
@@ -43,14 +47,17 @@ ${isNSFW
 
     if (!res.ok) {
       const err = await res.text();
-      console.error("HF error:", err);
-      return new Response(JSON.stringify({ reply: isNSFW ? "Ммм… я вся горю… подожди секунду" : "Ой, задумалась…" }), { status: 200 });
+      console.error("HF Router error:", err);
+      return new Response(JSON.stringify({ reply: isNSFW ? "Ммм… я вся горю… подожди секунду" : "Ой, задумалась…" }), { 
+        status: 200, 
+        headers: { "Content-Type": "application/json" } 
+      });
     }
 
     const data = await res.json();
     let reply = (Array.isArray(data) ? data[0]?.generated_text : data.generated_text || "").trim();
 
-    // Чистим от мусора
+    // Чистим от мусора (теги Zephyr)
     reply = reply
       .replace(/<\|assistant\|>.*?(?=<\|assistant\|>|$)/s, "")
       .replace(/<\|.*?\|>/g, "")
@@ -60,10 +67,18 @@ ${isNSFW
       reply = isNSFW ? "Аххх… давай ещё, я хочу тебя…" : "Привет, солнышко ❤️";
     }
 
-    return new Response(JSON.stringify({ reply }), { status: 200 });
+    console.log("HF Success:", reply.substring(0, 50) + "..."); // Лог успеха для Vercel
+
+    return new Response(JSON.stringify({ reply }), { 
+      status: 200, 
+      headers: { "Content-Type": "application/json" } 
+    });
 
   } catch (e) {
     console.error("Chat crash:", e);
-    return new Response(JSON.stringify({ reply: "Охх… я вся дрожу… давай ещё ❤️" }), { status: 200 });
+    return new Response(JSON.stringify({ reply: "Охх… я вся дрожу… давай ещё ❤️" }), { 
+      status: 200, 
+      headers: { "Content-Type": "application/json" } 
+    });
   }
 };
