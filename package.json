@@ -12,8 +12,11 @@
     "next": "14.2.5",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "framer-motion": "11.11.1",
-    "three": "0.161.0",
-    "openai": "4.47.3"
+    "framer-motion": "^11.11.1",
+    "three": "^0.161.0",
+    "openai": "^4.47.3",
+    "@react-three/fiber": "^8.16.8",
+    "@react-three/drei": "^9.88.13",
+    "framer-motion-3d": "^11.11.1"
   }
 }
