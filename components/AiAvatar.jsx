@@ -1,48 +1,83 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Image from "next/image";
+import { useMemo } from "react";
 
 export default function AiAvatar({ emotion = "neutral" }) {
-  const glow = {
-    neutral: "0 0 20px rgba(255, 46, 166, 0.4)",
-    happy: "0 0 28px rgba(255, 200, 80, 0.45)",
-    flirty: "0 0 28px rgba(255, 40, 120, 0.6)",
-    shy: "0 0 22px rgba(140, 80, 255, 0.55)",
-    curious: "0 0 26px rgba(80, 200, 255, 0.55)",
-  };
-
-  const scale = {
-    neutral: 1,
-    happy: 1.05,
-    flirty: 1.07,
-    shy: 0.96,
-    curious: 1.03,
-  };
+  const emotionGlow = useMemo(() => {
+    switch (emotion) {
+      case "happy":
+        return "0 0 25px rgba(255, 230, 95, 0.8)";
+      case "soft":
+        return "0 0 25px rgba(255, 46, 166, 0.8)";
+      case "sad":
+        return "0 0 25px rgba(70, 130, 255, 0.8)";
+      case "angry":
+        return "0 0 25px rgba(255, 80, 80, 0.8)";
+      default:
+        return "0 0 20px rgba(255, 255, 255, 0.25)";
+    }
+  }, [emotion]);
 
   return (
     <motion.div
-      initial={{ scale: 0.9 }}
-      animate={{
-        scale: scale[emotion],
-        boxShadow: glow[emotion],
-      }}
-      transition={{ duration: 0.6 }}
-      className="rounded-full overflow-hidden"
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ duration: 0.35 }}
       style={{
-        width: 120,
-        height: 120,
-        border: "2px solid rgba(255,255,255,0.2)",
+        width: 78,
+        height: 78,
+        position: "relative",
+        borderRadius: "50%",
+        overflow: "hidden",
+        boxShadow: emotionGlow,
       }}
     >
-      <motion.img
-        src="/avatar-default.png"
-        alt="AI avatar"
-        className="w-full h-full object-cover"
-        animate={{ scale: [1, 1.03, 1] }}
+      {/* Анимация дыхания */}
+      <motion.div
+        animate={{
+          scale: [1, 1.03, 1],
+        }}
         transition={{
-          duration: 4,
+          duration: 3.5,
           repeat: Infinity,
           ease: "easeInOut",
+        }}
+        style={{
+          width: "100%",
+          height: "100%",
+        }}
+      >
+        <Image
+          src="/avatar-default.png"
+          alt="AI Avatar"
+          width={200}
+          height={200}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
+      </motion.div>
+
+      {/* Легкое свечение вокруг */}
+      <motion.div
+        animate={{
+          opacity: [0.2, 0.5, 0.2],
+        }}
+        transition={{
+          duration: 2.6,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: "50%",
+          boxShadow: emotionGlow,
+          pointerEvents: "none",
         }}
       />
     </motion.div>
