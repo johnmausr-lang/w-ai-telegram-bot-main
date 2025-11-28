@@ -1,12 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
+  transpilePackages: ["three"],
   experimental: {
     serverActions: {
       allowedOrigins: ["*"]
     }
   }
-  // runtime: "nodejs" ← УДАЛИ ЭТУ СТРОКУ!
 };
 
 export default nextConfig;
