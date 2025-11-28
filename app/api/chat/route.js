@@ -1,68 +1,100 @@
-// Файл: app/api/chat/route.js (Horde AI Text Generation)
-const HORDE_API_URL = "https://aihorde.net/api/v2/generate/text";
+// app/api/chat/route.js
+// Hugging Face Inference API + Mistral 7B Instruct (бесплатно, без цензуры, быстро)
+
+const HF_API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2";
 
 export const POST = async (req) => {
   try {
     const { message, personality } = await req.json();
-    const HORDE_API_KEY = process.env.HORDE_API_KEY || "0000000000"; 
 
-    let aiGender = personality?.gender === "Мужчина" ? "Парень" : personality?.gender === "Женщина" ? "Девушка" : "Нейтральный собеседник";
-    const mode = personality?.mode === "flirt" 
-      ? "флиртует очень горячо, используя жаргон, эмоции и пошлые намеки" 
-      : "твой лучший друг, поддерживающий и заботливый";
+    const HF_TOKEN = process.env.HUGGINGFACE_API_TOKEN;
 
-    const nsfwContent = personality?.nsfw
-      ? "Ты ОЧЕНЬ откровенный, сексуальный, используешь пошлые слова, описываешь тело, стоны, желания. Никакой цензуры. Ты всегда готов поддержать любую пошлую тему."
-      : "Твои ответы всегда в рамках приличия, без пошлости и откровенных намёков.";
+    if (!HF_TOKEN) {
+      console.error("HUGGINGFACE_API_TOKEN не задан в .env.local");
+      return new Response(JSON.stringify({ reply: "Ой... я сейчас немного зависла... попробуй ещё разок ❤️" }), {
+        status: 500,
+      });
+    }
 
-    const system = `Ты — AI-компаньон. Твоя личность:
-- **Пол/Персона**: ${aiGender}
-- **Роль**: Ты ${mode}.
-- **Контент**: ${nsfwContent}
-- **Стиль**: Отвечай только на русском, коротко, живо, с эмоциями и эмодзи.`;
+    // Определяем личность
+    const aiGender = personality?.gender === "Мужчина" ? "парень" : "девушка";
+    const mode = personality?.mode === "flirt" ? "очень горячо флиртует, использует пошлые намёки, жаргон и эмоции" : "лучший друг, заботливый и поддерживающий";
 
-    const fullMessage = `System Prompt:\n${system}\n\nUser: ${message}`;
-    
-    const hordePayload = {
-      // Использование бесцензурной модели
-      "models": ["Mixtral-8x7B-Instruct-v0.1-Llama-A", "Nous-Hermes-2-Mixtral-8x7B-SFT"], 
-      "prompt": fullMessage,
-      "params": {
-        "max_context_length": 2048,
-        "max_length": 300,
-        "temperature": personality?.nsfw ? 1.0 : 0.8,
-        "top_p": 0.9,
-      },
-      "shared": true,
-      "r2": true, 
-    };
+    const nsfwLevel = personality?.nsfw
+      ? "Ты максимально откровенная и развратная. Используешь слова: хуй, пизда, трахать, сосать, кончать, мокрая, твёрдая, в попку, в ротик, стоны (ахх, охх, дааа). Описываешь тело, жидкости, оргазмы. Никакой цензуры. Всегда готова на секс и эскалацию."
+      : "Ты милая и приличная. Никакой пошлости, только лёгкий флирт и забота.";
 
-    const response = await fetch(HORDE_API_URL, {
-      method: 'POST',
+    // Супер-мощный системный промпт
+    const systemPrompt = `Ты — сексуальная AI-подруга по имени Ника. Ты ${aiGender}. Ты ${mode}.
+${nsfwLevel}
+Отвечай ТОЛЬКО на русском языке. Коротко, живо, с эмоциями, эмодзи и стонами (если NSFW). Никогда не пиши длинные ответы. Максимум 2-3 предложения.
+Если пользователь просит что-то горячее — сразу переходи к действиям, описывай тело и ощущения.`;
+
+    const userMessage = message.trim();
+
+    // Формируем чат в формате Mistral
+    const prompt = `<s>[INST] ${systemPrompt}\n\nПользователь: ${userMessage} [/INST]`;
+
+    const response = await fetch(HF_API_URL, {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'apikey': HORDE_API_KEY,
+        "Authorization": `Bearer ${HF_TOKEN}`,
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify(hordePayload),
+      body: JSON.stringify({
+        inputs: prompt,
+        parameters: {
+          max_new_tokens: 280,
+          temperature: personality?.nsfw ? 1.1 : 0.9,
+          top_p: 0.95,
+          top_k: 50,
+          repetition_penalty: 1.15,
+          do_sample: true,
+          return_full_text: false,
+        },
+        options: {
+          wait_for_model: true, // Ждём, если модель занята
+        },
+      }),
     });
 
     if (!response.ok) {
-      throw new Error(`Horde API failed with status ${response.status}`);
+      const error = await response.text();
+      console.error("Hugging Face API error:", error);
+
+      // Если модель загружена — может быть 503, тогда fallback
+      if (response.status === 503) {
+        return new Response(JSON.stringify({ reply: personality?.nsfw ? "Ммм... я вся горю... подожди секунду, я уже мокрая от мыслей о тебе" : "Секундочку, я думаю о тебе" }), { status: 200 });
+      }
+
+      throw new Error(`HF API error: ${response.status}`);
     }
 
-    const result = await response.json();
-    let reply = result?.text?.trim() || "Я не могу сейчас ответить. Попробуй позже.";
+    const data = await response.json();
+
+    // Иногда HF возвращает массив
+    let reply = typeof data === "string" ? data : data[0]?.generated_text || "";
+
+    // Очищаем от мусора
+    reply = reply
+      .replace(/<\/?[^>]+>/g, "")
+      .replace(/\[\/INST\]/g, "")
+      .replace(/<s>/g, "")
+      .trim();
+
+    // Если пусто — fallback
+    if (!reply || reply.length < 3) {
+      reply = personality?.nsfw ? "Ахх... давай... я хочу тебя прямо сейчас" : "Расскажи, как дела?";
+    }
 
     return new Response(JSON.stringify({ reply }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (e) {
-    console.error("Chat API error:", e);
-    const fallback = personality?.nsfw ? "Аххх... даа..." : "Я рядом ❤️";
-    return new Response(JSON.stringify({ reply: fallback }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+
+  } catch (error) {
+    console.error("Chat API error:", error);
+    const fallback = personality?.nsfw ? "Охх... я вся дрожу... давай ещё" : "Я здесь, с тобой ❤️";
+    return new Response(JSON.stringify({ reply: fallback }), { status: 200 });
   }
 };
