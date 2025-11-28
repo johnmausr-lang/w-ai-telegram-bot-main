@@ -6,15 +6,12 @@ export async function POST(req) {
   const form = await req.formData();
   const file = form.get("file");
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  const transcript = await openai.audio.transcriptions.create({
+  const transcript = await client.audio.transcriptions.create({
     file,
-    model: "gpt-4o-mini-tts",
+    model: "gpt-4o-mini-transcribe",
   });
 
-  return new Response(
-    JSON.stringify({ text: transcript.text }),
-    { headers: { "Content-Type": "application/json" } }
-  );
+  return Response.json({ text: transcript.text });
 }
