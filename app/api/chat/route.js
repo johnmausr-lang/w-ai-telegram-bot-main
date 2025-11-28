@@ -1,5 +1,5 @@
-// app/api/chat/route.js
-const HF_API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2";
+// app/api/chat/route.js  ← только эта строка меняется!
+const HF_API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta";
 
 export const POST = async (req) => {
   try {
