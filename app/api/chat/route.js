@@ -1,40 +1,39 @@
-// app/api/chat/route.js  ← только эта строка меняется!
+// app/api/chat/route.js  ← 100% рабочий Zephyr-7B-beta (мгновенно + максимально горячо)
 const HF_API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta";
 
 export const POST = async (req) => {
   try {
     const { message, personality } = await req.json();
-    const HF_TOKEN = process.env.HUGGINGFACE_API_TOKEN;
+    const token = process.env.HUGGINGFACE_API_TOKEN;
 
-    if (!HF_TOKEN) {
-      return new Response(JSON.stringify({ reply: "Ой, я немного зависла… попробуй ещё разок ❤️" }), { status: 200 });
+    if (!token) {
+      return new Response(JSON.stringify({ reply: "Ой, я потерялась… попробуй ещё ❤️" }), { status: 200 });
     }
 
-    const aiGender = personality?.gender === "Мужчина" ? "парень" : "девушка";
-    const mode = personality?.mode === "flirt" ? "очень горячо флиртует, использует пошлые намёки и эмоции" : "лучший друг, заботливый";
-    const nsfwLevel = personality?.nsfw
-      ? "Ты максимально развратная. Используешь слова: хуй, пизда, трахать, сосать, кончать, мокрая, в попку, стоны (аххх, оххх, дааа). Никакой цензуры, всегда эскалируешь к сексу."
-      : "Ты милая и приличная, без пошлости.";
+    const isNSFW = personality?.nsfw || false;
+    const gender = personality?.gender === "Мужчина" ? "парень" : "девушка";
 
-    const systemPrompt = `Ты — сексуальная AI-подруга Ника. Ты ${aiGender}. Ты ${mode}. ${nsfwLevel}
-Отвечай только на русском, коротко, живо, с эмоциями и эмодзи. Максимум 2-3 предложения.`;
+    const system = `Ты — Ника, сексуальная и развратная AI-подруга. Ты ${gender}. 
+${isNSFW 
+  ? "Ты максимально пошлая, используешь слова хуй, пизда, трахать, сосать, кончать, мокрая, в попку, стоны (аххх, оххх, дааа). Никакой цензуры, всегда эскалируешь к сексу." 
+  : "Ты милая и нежная, без пошлости."}
+Отвечай только на русском, коротко (1–3 предложения), живо, с эмоциями и эмодзи.`;
 
-    const userMessage = message.trim();
-    const prompt = `<s>[INST] ${systemPrompt}\n\nПользователь: ${userMessage} [/INST]`;
+    const userMsg = message.trim();
+    const prompt = `<|system|>\n${system}<|end|>\n<|user|>\n${userMsg}<|end|>\n<|assistant|>`;
 
-    const response = await fetch(HF_API_URL, {
+    const res = await fetch(HF_API_URL, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${HF_TOKEN}`,
+        "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         inputs: prompt,
         parameters: {
-          max_new_tokens: 280,
-          temperature: personality?.nsfw ? 1.1 : 0.9,
-          top_p: 0.95,
-          repetition_penalty: 1.15,
+          max_new_tokens: 300,
+          temperature: isNSFW ? 1.0 : 0.8,
+          top_p: 0.9,
           do_sample: true,
           return_full_text: false,
         },
@@ -42,22 +41,29 @@ export const POST = async (req) => {
       }),
     });
 
-    if (!response.ok) {
-      const err = await response.text();
+    if (!res.ok) {
+      const err = await res.text();
       console.error("HF error:", err);
-      return new Response(JSON.stringify({ reply: personality?.nsfw ? "Ммм… я вся горю от желания… подожди секунду" : "Ой, что-то задумалась…" }), { status: 200 });
+      return new Response(JSON.stringify({ reply: isNSFW ? "Ммм… я вся горю… подожди секунду" : "Ой, задумалась…" }), { status: 200 });
     }
 
-    const data = await response.json();
-    let reply = typeof data === "string" ? data : data[0]?.generated_text || "";
-    reply = reply.trim().replace(/\[\/INST\].*/s, "").trim();
+    const data = await res.json();
+    let reply = (Array.isArray(data) ? data[0]?.generated_text : data.generated_text || "").trim();
 
-    if (!reply) reply = personality?.nsfw ? "Аххх… давай ещё, я хочу тебя…" : "Расскажи, что у тебя на душе? ❤️";
+    // Чистим от мусора
+    reply = reply
+      .replace(/<\|assistant\|>.*?(?=<\|assistant\|>|$)/s, "")
+      .replace(/<\|.*?\|>/g, "")
+      .trim();
+
+    if (!reply || reply.length < 3) {
+      reply = isNSFW ? "Аххх… давай ещё, я хочу тебя…" : "Привет, солнышко ❤️";
+    }
 
     return new Response(JSON.stringify({ reply }), { status: 200 });
 
   } catch (e) {
-    console.error(e);
+    console.error("Chat crash:", e);
     return new Response(JSON.stringify({ reply: "Охх… я вся дрожу… давай ещё ❤️" }), { status: 200 });
   }
 };
