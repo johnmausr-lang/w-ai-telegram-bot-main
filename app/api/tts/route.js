@@ -5,20 +5,16 @@ export const runtime = "nodejs";
 export async function POST(req) {
   const { text } = await req.json();
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  const tts = await openai.audio.speech.create({
+  const mp3 = await client.audio.speech.create({
     model: "gpt-4o-mini-tts",
-    voice: "nova",
+    voice: "alloy",
     input: text,
   });
 
-  const buffer = Buffer.from(await tts.arrayBuffer());
-
-  return new Response(buffer, {
-    headers: {
-      "Content-Type": "audio/mpeg",
-      "Content-Length": buffer.length,
-    },
+  const buf = Buffer.from(await mp3.arrayBuffer());
+  return new Response(buf, {
+    headers: { "Content-Type": "audio/mpeg" },
   });
 }
