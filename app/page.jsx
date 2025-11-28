@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 import ParallaxBg from "@/components/ParallaxBg";
 import AiAvatar from "@/components/AiAvatar";
@@ -15,7 +15,6 @@ import RelationshipBar from "@/components/RelationshipBar";
 
 import { detectEmotion } from "@/lib/emotionDetector";
 import { saveChat, loadChat } from "@/lib/chatStorage";
-
 import { themes } from "@/app/themes";
 
 export default function Page() {
@@ -23,7 +22,7 @@ export default function Page() {
   const [theme, setTheme] = useState("neonPink");
   const activeTheme = themes[theme];
 
-  // UI STATE
+  // UI
   const [activeTab, setActiveTab] = useState("chat");
   const [onboardingVisible, setOnboardingVisible] = useState(true);
 
@@ -151,8 +150,8 @@ export default function Page() {
     <div
       className="relative w-full min-h-screen"
       style={{
-        background: "black",
-        color: "white",
+        background: "#000",
+        color: "#fff",
       }}
     >
       <ParallaxBg />
@@ -180,10 +179,8 @@ export default function Page() {
           {/* HEADER */}
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-3xl font-bold">Neon Glow AI</h1>
-              <p className="text-white/60">
-                Персональный AI-компаньон
-              </p>
+              <h1 className="text-3- font-bold">Neon Glow AI</h1>
+              <p className="text-white/60">Персональный AI-компаньон</p>
             </div>
 
             <AiAvatar emotion={emotion} />
@@ -191,7 +188,7 @@ export default function Page() {
 
           <RelationshipBar level={relationshipLevel} />
 
-          {/* CHAT MODE */}
+          {/* CHAT */}
           {activeTab === "chat" && (
             <div>
               <div
@@ -215,7 +212,7 @@ export default function Page() {
                             msg.role === "user"
                               ? activeTheme.glow
                               : "rgba(255,255,255,0.08)",
-                          color: "white",
+                          color: "#fff",
                         }}
                       >
                         {msg.content}
