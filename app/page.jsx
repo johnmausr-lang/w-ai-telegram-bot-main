@@ -1,8 +1,5 @@
 "use client";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 
@@ -17,59 +14,53 @@ import { detectEmotion } from "@/lib/emotionDetector";
 import { saveChat, loadChat } from "@/lib/chatStorage";
 import { themes } from "@/app/themes";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export default function Page() {
-  // THEMES
   const [theme, setTheme] = useState("neonPink");
   const activeTheme = themes[theme];
 
-  // UI
   const [activeTab, setActiveTab] = useState("chat");
   const [onboardingVisible, setOnboardingVisible] = useState(true);
 
-  // CHARACTER
   const [personality, setPersonality] = useState({
     gender: "Женщина",
     mode: "gentle",
     theme: "neonPink",
   });
 
-  // CHAT
   const [chat, setChat] = useState([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // RELATIONSHIP
   const [relationshipLevel, setRelationshipLevel] = useState(0);
-
-  // EMOTION
   const [emotion, setEmotion] = useState("neutral");
 
-  // IMAGE GEN
   const [generatedImage, setGeneratedImage] = useState(null);
   const [imgLoading, setImgLoading] = useState(false);
 
   const endRef = useRef(null);
 
-  // LOAD CHAT FROM STORAGE
+  // Load chat from localStorage
   useEffect(() => {
-    const saved = loadChat();
-    if (saved.length > 0) setChat(saved);
+    const data = loadChat();
+    if (data.length > 0) setChat(data);
   }, []);
 
-  // SAVE CHAT
+  // Scroll & save chat
   useEffect(() => {
     saveChat(chat);
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat]);
 
-  // SEND MESSAGE
+  // Send message
   async function sendMessage() {
     if (!message.trim() || loading) return;
 
-    const userEntry = { role: "user", content: message };
-    setChat((prev) => [...prev, userEntry]);
-
-    const currentMsg = message;
+    const userMessage = message;
+    const entry = { role: "user", content: userMessage };
+    setChat((prev) => [...prev, entry]);
     setMessage("");
     setLoading(true);
 
@@ -78,29 +69,36 @@ export default function Page() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: currentMsg,
+          message: userMessage,
           personality,
         }),
       });
 
-      const data = await res.json();
-      const reply = data.reply ?? "…";
+      let data = null;
 
-      const aiEntry = { role: "assistant", content: reply };
-      setChat((p) => [...p, aiEntry]);
+      try {
+        data = await res.json();
+      } catch {
+        console.error("Chat API returned non-JSON response");
+      }
 
-      const e = detectEmotion(reply);
-      setEmotion(e);
+      const reply = data?.reply ?? "…";
 
-      setRelationshipLevel((r) => Math.min(4, r + 1));
+      setChat((prev) => [...prev, { role: "assistant", content: reply }]);
+
+      const emo = detectEmotion(reply);
+      setEmotion(emo);
+
+      setRelationshipLevel((lvl) => Math.min(4, lvl + 1));
 
       playTTS(reply);
-    } catch {
+    } catch (e) {
+      console.error("CHAT ERROR:", e);
       setChat((p) => [
         ...p,
         {
           role: "assistant",
-          content: "Произошла ошибка… но я рядом 💛",
+          content: "Произошла ошибка, но я всё ещё с тобой 💛",
         },
       ]);
     }
@@ -117,13 +115,15 @@ export default function Page() {
         body: JSON.stringify({ text }),
       });
 
-      const buf = await res.arrayBuffer();
-      const audio = new Audio(URL.createObjectURL(new Blob([buf])));
+      const arrayBuf = await res.arrayBuffer();
+      const audio = new Audio(URL.createObjectURL(new Blob([arrayBuf])));
       audio.play();
-    } catch {}
+    } catch (e) {
+      console.error("TTS ERROR:", e);
+    }
   }
 
-  // IMG
+  // Image generation
   async function generateImage() {
     setImgLoading(true);
     setGeneratedImage(null);
@@ -137,25 +137,30 @@ export default function Page() {
         }),
       });
 
-      const data = await res.json();
-      if (data.image) {
+      let data = null;
+
+      try {
+        data = await res.json();
+      } catch {
+        console.error("Image API returned non-JSON");
+      }
+
+      if (data?.image) {
         setGeneratedImage(`data:image/png;base64,${data.image}`);
       }
-    } finally {
-      setImgLoading(false);
+    } catch (e) {
+      console.error("IMAGE GENERATION ERROR:", e);
     }
+
+    setImgLoading(false);
   }
 
   return (
-    <div
-      className="relative w-full min-h-screen"
-      style={{
-        background: "#000",
-        color: "#fff",
-      }}
-    >
+    <div className="relative w-full min-h-screen bg-black text-white overflow-x-hidden">
+      {/* Background */}
       <ParallaxBg />
 
+      {/* Onboarding */}
       <Onboarding
         visible={onboardingVisible}
         onComplete={() => {
@@ -165,65 +170,56 @@ export default function Page() {
         setPersonality={setPersonality}
       />
 
+      {/* Main UI */}
       {!onboardingVisible && (
         <motion.div
           className="relative z-20 w-full max-w-2xl mx-auto bg-white/10 
                      backdrop-blur-2xl p-6 mt-14 mb-24 border border-white/10
                      rounded-3xl shadow-2xl"
-          style={{
-            boxShadow: `0 0 25px ${activeTheme.glow}`,
-          }}
-          initial={{ opacity: 0, y: 20 }}
+          style={{ boxShadow: `0 0 25px ${activeTheme.glow}` }}
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          {/* HEADER */}
+          {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-3- font-bold">Neon Glow AI</h1>
-              <p className="text-white/60">Персональный AI-компаньон</p>
+              <h1 className="text-3xl font-bold">Neon Glow AI</h1>
+              <p className="text-white/60">Твой персональный AI-компаньон</p>
             </div>
-
             <AiAvatar emotion={emotion} />
           </div>
 
           <RelationshipBar level={relationshipLevel} />
 
-          {/* CHAT */}
+          {/* CHAT TAB */}
           {activeTab === "chat" && (
             <div>
-              <div
-                style={{
-                  maxHeight: "420px",
-                  overflowY: "auto",
-                  paddingRight: 4,
-                }}
-              >
-                {chat.map((msg, i) => (
+              <div className="max-h-[420px] overflow-y-auto pr-2">
+                {chat.map((m, i) => (
                   <div key={i} className="mb-3">
                     <div
-                      style={{
-                        textAlign: msg.role === "user" ? "right" : "left",
-                      }}
+                      className={
+                        m.role === "user" ? "text-right" : "text-left"
+                      }
                     >
                       <span
                         className="inline-block px-4 py-2 rounded-xl blur-glass"
                         style={{
                           background:
-                            msg.role === "user"
+                            m.role === "user"
                               ? activeTheme.glow
                               : "rgba(255,255,255,0.08)",
-                          color: "#fff",
                         }}
                       >
-                        {msg.content}
+                        {m.content}
                       </span>
                     </div>
                   </div>
                 ))}
-                <div ref={endRef}></div>
+                <div ref={endRef} />
               </div>
 
-              {/* INPUT */}
+              {/* Input */}
               <div className="flex gap-3 mt-4">
                 <input
                   value={message}
@@ -231,20 +227,18 @@ export default function Page() {
                   placeholder="Напиши что-нибудь…"
                   className="flex-1 px-4 py-3 rounded-xl bg-white/10"
                 />
-
                 <button
                   onClick={sendMessage}
                   className="px-4 py-3 bg-pink-500 rounded-xl font-bold"
                 >
                   ➤
                 </button>
-
                 <VoiceButton onResult={(txt) => setMessage(txt)} />
               </div>
             </div>
           )}
 
-          {/* IMAGE MODE */}
+          {/* IMAGE TAB */}
           {activeTab === "image" && (
             <div className="text-center">
               {generatedImage && (
@@ -253,33 +247,37 @@ export default function Page() {
                   className="w-full rounded-xl mb-4"
                 />
               )}
+
               {imgLoading && (
                 <p className="text-white/60 mb-4">Создание образа…</p>
               )}
+
               <button
                 onClick={generateImage}
                 className="w-full py-3 bg-pink-500 rounded-xl font-bold"
               >
-                Создать новое изображение
+                Создать изображение
               </button>
             </div>
           )}
 
-          {/* SETTINGS */}
+          {/* SETTINGS TAB */}
           {activeTab === "settings" && (
             <div className="space-y-4">
               <h2 className="text-xl font-bold mb-3">Персонализация</h2>
 
               <div className="space-y-2">
-                <p className="text-white/70">Тема</p>
-
+                <p className="text-white/70">Тема интерфейса</p>
                 <div className="flex gap-3">
                   {Object.keys(themes).map((t) => (
                     <button
                       key={t}
                       onClick={() => {
                         setTheme(t);
-                        setPersonality({ ...personality, theme: t });
+                        setPersonality({
+                          ...personality,
+                          theme: t,
+                        });
                       }}
                       className="px-4 py-2 rounded-xl bg-white/10"
                     >
