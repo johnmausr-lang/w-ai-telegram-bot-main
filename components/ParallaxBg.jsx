@@ -7,53 +7,47 @@ export default function ParallaxBg() {
   const mount = useRef(null);
 
   useEffect(() => {
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x000000, 1, 6);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
 
-    const camera = new THREE.PerspectiveCamera(
-      60,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      20
-    );
-    camera.position.z = 3;
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 1000);
+    camera.position.z = 5;
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: true,
     });
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(w, h);
     renderer.setPixelRatio(window.devicePixelRatio);
 
     mount.current.appendChild(renderer.domElement);
 
-    // Neon plane
-    const geometry = new THREE.PlaneGeometry(4, 4, 64, 64);
+    const geometry = new THREE.SphereGeometry(3, 32, 32);
     const material = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(0xff2ea6),
+      color: 0xff2ea6,
       wireframe: true,
+      transparent: true,
+      opacity: 0.15,
     });
+    const sphere = new THREE.Mesh(geometry, material);
 
-    const mesh = new THREE.Mesh(geometry, material);
-    scene.add(mesh);
-
-    let mouseX = 0;
-    let mouseY = 0;
+    scene.add(sphere);
 
     const onMouseMove = (e) => {
-      mouseX = (e.clientX / window.innerWidth - 0.5) * 0.4;
-      mouseY = (e.clientY / window.innerHeight - 0.5) * 0.4;
+      const x = (e.clientX / w - 0.5) * 0.2;
+      const y = (e.clientY / h - 0.5) * 0.2;
+      sphere.rotation.x = y;
+      sphere.rotation.y = x;
     };
 
     window.addEventListener("mousemove", onMouseMove);
 
     const animate = () => {
       requestAnimationFrame(animate);
-      mesh.rotation.x = mouseY;
-      mesh.rotation.y = mouseX;
+      sphere.rotation.z += 0.001;
       renderer.render(scene, camera);
     };
-
     animate();
 
     return () => {
@@ -66,10 +60,10 @@ export default function ParallaxBg() {
     <div
       ref={mount}
       style={{
-        position: "absolute",
+        position: "fixed",
         inset: 0,
-        zIndex: 0,
-        pointerEvents: "none",
+        zIndex: 1,
+        opacity: 0.35,
       }}
     />
   );
