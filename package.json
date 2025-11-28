@@ -1,7 +1,22 @@
 {
-  "name":"neon-glow-ai",
-  "version":"1.0.0",
-  "private":true,
-  "type":"module",
-  "scripts":{ "dev":"next dev", "build":"next build", "start":"next start" }
+  "name": "neon-glow-ai-pro",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "framer-motion": "11.11.1",
+    "three": "0.161.0",
+    "openai": "4.47.3"
+  }
 }
