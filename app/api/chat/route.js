@@ -3,28 +3,28 @@ import OpenAI from "openai";
 export const runtime = "nodejs";
 
 export async function POST(req) {
-  const { message, personality } = await req.json();
+  try {
+    const { message, personality } = await req.json();
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-  const prompt = `
-Ты — персональный AI-компаньон.
-Стиль: ${personality.mode}
+    const systemPrompt = `
+Ты — дружелюбный AI-компаньон.
 Пол: ${personality.gender}
-Тема: ${personality.theme}
-Отвечай естественно, живо, эмоционально.
-`;
+Стиль: ${personality.mode}
+Отвечай тепло, живо, эмоционально, но без NSFW.
+    `;
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: prompt },
-      { role: "user", content: message },
-    ],
-  });
+    const response = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: message },
+      ],
+    });
 
-  return new Response(
-    JSON.stringify({ reply: completion.choices[0].message.content }),
-    { headers: { "Content-Type": "application/json" } }
-  );
+    return Response.json({ reply: response.choices[0].message.content });
+  } catch (e) {
+    return Response.json({ reply: "Ошибка соединения…" });
+  }
 }
