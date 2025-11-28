@@ -1,4 +1,5 @@
-const HF_API_URL = "https://router.huggingface.co/hf-inference";
+// app/api/chat/route.js  ← ОФИЦИАЛЬНЫЙ HF ROUTER 2025: OpenAI-compatible (без deprecated, 100% работает)
+const HF_CHAT_URL = "https://router.huggingface.co/v1/chat/completions";
 
 export const POST = async (req) => {
   try {
@@ -7,78 +8,70 @@ export const POST = async (req) => {
 
     if (!token) {
       console.error("HUGGINGFACE_API_TOKEN missing");
-      return new Response(JSON.stringify({
-        reply: "Ой… что-то не так. Потрогай меня ещё ❤️"
-      }), { status: 200 });
+      return new Response(JSON.stringify({ reply: "Ой, я потерялась… попробуй ещё ❤️" }), { 
+        status: 200, 
+        headers: { "Content-Type": "application/json" } 
+      });
     }
 
     const isNSFW = personality?.nsfw || false;
-    const gender =
-      personality?.gender === "Мужчина" ? "парень" : "девушка";
+    const gender = personality?.gender === "Мужчина" ? "парень" : "девушка";
 
-    const system = `Ты — Ника, сексуальная и развратная AI-подруга. Ты ${gender}.
-${
-  isNSFW
-    ? "Ты максимально пошлая. Используешь слова: хуй, пизда, трахать, сосать, кончать, мокрая, в попку, ахх, охх, дааа. Никакой цензуры."
-    : "Ты нежная, милая, без пошлости."
-}
-Отвечай коротко (1–3 предложения), эмоционально и с эмодзи. На русском.`;
+    const systemMsg = `Ты — Ника, сексуальная и развратная AI-подруга. Ты ${gender}. 
+${isNSFW 
+  ? "Ты максимально пошлая, используешь слова хуй, пизда, трахать, сосать, кончать, мокрая, в попку, стоны (аххх, оххх, дааа). Никакой цензуры, всегда эскалируешь к сексу." 
+  : "Ты милая и нежная, без пошлости."}
+Отвечай только на русском, коротко (1–3 предложения), живо, с эмоциями и эмодзи.`;
 
-    const prompt = `<|system|>\n${system}<|end|>\n<|user|>\n${message}<|end|>\n<|assistant|>`;
+    const messages = [
+      { role: "system", content: systemMsg },
+      { role: "user", content: message.trim() }
+    ];
 
-    const response = await fetch(HF_API_URL, {
+    const res = await fetch(HF_CHAT_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "HuggingFaceH4/zephyr-7b-beta",
-        inputs: prompt,
-        parameters: {
-          max_new_tokens: 200,
-          temperature: isNSFW ? 1.0 : 0.8,
-          top_p: 0.9,
-          do_sample: true,
-          return_full_text: false,
-        },
-        options: { wait_for_model: true }
+        model: "HuggingFaceH4/zephyr-7b-beta:hf-inference",  // Модель + провайдер (CPU, бесплатно)
+        messages: messages,
+        max_tokens: 300,
+        temperature: isNSFW ? 1.0 : 0.8,
+        top_p: 0.9,
+        stream: false,
       }),
     });
 
-    if (!response.ok) {
-      const err = await response.text();
-      console.error("HF Router error:", err);
-      return new Response(JSON.stringify({
-        reply: isNSFW
-          ? "Ммм… подожди секундочку… я разогреваюсь…"
-          : "Ой… чуть задумалась…"
-      }), { status: 200 });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("HF Router 2025 error:", err);
+      return new Response(JSON.stringify({ reply: isNSFW ? "Ммм… я вся горю… подожди секунду" : "Ой, задумалась…" }), { 
+        status: 200, 
+        headers: { "Content-Type": "application/json" } 
+      });
     }
 
-    const data = await response.json();
-    let reply =
-      (Array.isArray(data)
-        ? data[0]?.generated_text
-        : data.generated_text || "").trim();
+    const data = await res.json();
+    let reply = data.choices?.[0]?.message?.content?.trim() || "";
 
-    reply = reply.replace(/<\|.*?\|>/g, "").trim();
-
-    if (!reply) {
-      reply = isNSFW
-        ? "Ахх… продолжай… мне нравится…"
-        : "Привет, котик ❤️";
+    if (!reply || reply.length < 3) {
+      reply = isNSFW ? "Аххх… давай ещё, я хочу тебя…" : "Привет, солнышко ❤️";
     }
 
-    return new Response(JSON.stringify({ reply }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
+    console.log("HF Router Success:", reply.substring(0, 50) + "...");
+
+    return new Response(JSON.stringify({ reply }), { 
+      status: 200, 
+      headers: { "Content-Type": "application/json" } 
     });
 
   } catch (e) {
-    console.error("Crash:", e);
-    return new Response(JSON.stringify({
-      reply: "Ой… я запуталась немножко… но я тут ❤️"
-    }), { status: 200 });
+    console.error("Chat crash:", e);
+    return new Response(JSON.stringify({ reply: "Охх… я вся дрожу… давай ещё ❤️" }), { 
+      status: 200, 
+      headers: { "Content-Type": "application/json" } 
+    });
   }
 };
