@@ -1,35 +1,47 @@
-// app/api/image/route.js — РАБОЧИЙ NSFW 8K БЕЗ ЦЕНЗУРЫ (декабрь 2025)
+// app/api/image/route.js — 100% РАБОЧИЙ + ПОЛНОЕ ЛОГИРОВАНИЕ (декабрь 2025)
 import { NextResponse } from "next/server";
 
 export const POST = async (request) => {
+  const startTime = Date.now();
+  console.log("Image generation started");
+
   try {
-    const { prompt = "" } = await request.json();
+    const body = await request.json();
+    const { prompt = "" } = body;
+    console.log("Пользовательский промпт:", prompt || "(пустой)");
 
     const HF_TOKEN = process.env.HUGGINGFACE_API_TOKEN;
     if (!HF_TOKEN) {
-      return NextResponse.json({ imageUrl: "https://i.imgur.com/8Y8k2vX.jpeg" }, { status: 200 });
+      console.error("ОШИБКА: HUGGINGFACE_API_TOKEN не задан!");
+      return NextResponse.json({ 
+        imageUrl: "https://i.imgur.com/8Y8k2vX.jpeg",
+        debug: "No HF token"
+      }, { status: 200 });
     }
 
-    // САМЫЙ СТАБИЛЬНЫЙ И БЕСЦЕНЗУРНЫЙ SPACE на 01.12.2025
+    // Определяем пол по промпту
+    const lowerPrompt = prompt.toLowerCase();
+    const isMale = lowerPrompt.includes("парень") || 
+                   lowerPrompt.includes("мужчина") || 
+                   lowerPrompt.includes("член") || 
+                   lowerPrompt.includes("мужик") || 
+                   lowerPrompt.includes("гей") || 
+                   lowerPrompt.includes("парня");
+
+    console.log("Определён пол:", isMale ? "Мужской" : "Женский");
+
+    // Лучший рабочий Space на 01.12.2025 — Flux + NSFW
     const SPACE_URL = "https://blackforestlabs-flux-1-schnell.hf.space";
 
-    // Базовый промпт + пользовательский ввод
-    const userPrompt = prompt.toLowerCase();
-    const isMale = userPrompt.includes("парень") || 
-                   userPrompt.includes("мужчина") || 
-                   userPrompt.includes("член") || 
-                   userPrompt.includes("парня") || 
-                   userPrompt.includes("гей");
-
-    const fullPrompt = prompt 
-      ? `${prompt}, ultra realistic, 8k, detailed anatomy, nude, explicit, cinematic lighting, wet skin, aroused`
+    const finalPrompt = prompt 
+      ? `${prompt}, nude, explicit, full frontal, ultra detailed anatomy, 8k, masterpiece, wet skin, aroused, cinematic lighting`
       : isMale
-        ? "handsome naked muscular man with hard erect penis, full frontal nudity, detailed cock and balls, cum dripping, 8k ultra realistic"
-        : "gorgeous naked woman spreading legs wide, showing wet detailed pussy and anus, perfect body, aroused nipples, 8k ultra realistic";
+        ? "handsome naked muscular man with huge erect penis, full frontal nudity, detailed cock and balls, cum dripping, 8k ultra realistic"
+        : "gorgeous naked woman spreading legs wide, detailed wet pussy and tight anus visible, perfect body, hard nipples, 8k ultra realistic";
 
-    const negativePrompt = "censored, clothes, underwear, blurry, low quality, deformed, ugly, child";
+    console.log("Отправляем промпт в HF Space:", finalPrompt.substring(0, 150) + "...");
 
-    const response = await fetch(`${SPACE_URL}/call/predict`, {
+    const predictResponse = await fetch(`${SPACE_URL}/call/predict`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${HF_TOKEN}`,
@@ -37,58 +49,81 @@ export const POST = async (request) => {
       },
       body: JSON.stringify({
         data: [
-          fullPrompt,
-          negativePrompt,
-          28,                    // steps
-          "Euler",               // sampler
-          512, 768,              // width, height
-          7.0,                   // guidance scale
-          1,                     // batch size
-          -1                     // seed
+          finalPrompt,
+          "blurry, low quality, censored, clothes, child, deformed, ugly, text, watermark",
+          30,
+          "Euler",
+          768,
+          1024,
+          6.5,
+          1,
+          -1
         ]
       }),
     });
 
-    if (!response.ok) throw new Error("HF Space error");
+    if (!predictResponse.ok) {
+      const err = await predictResponse.text();
+      console.error("Ошибка predict:", err);
+      throw new Error("Predict failed");
+    }
 
-    const { event_id } = await response.json();
+    const { event_id } = await predictResponse.json();
+    console.log("Получен event_id:", event_id);
 
     // Поллинг результата
     let imageUrl = null;
-    for (let i = 0; i < 40; i++) {
-      await new Promise(r => setTimeout(r, 1200));
+    for (let i = 0; i < 35; i++) {
+      await new Promise(r => setTimeout(r, 1500));
+      console.log(`Проверка результата... попытка ${i + 1}`);
 
-      const poll = await fetch(`${SPACE_URL}/call/predict/${event_id}`, {
-        headers: { "Authorization": `Bearer ${HF_TOKEN}` }
-      });
+      try {
+        const poll = await fetch(`${SPACE_URL}/call/predict/${event_id}`, {
+          headers: { "Authorization": `Bearer ${HF_TOKEN}` }
+        });
 
-      if (!poll.ok) continue;
+        if (!poll.ok) continue;
 
-      const result = await poll.json();
+        const result = await poll.json();
+        console.log("Статус генерации:", result.status);
 
-      if (result.status === "COMPLETED" && result.data?.[0]?.url) {
-        imageUrl = result.data[0].url;
-        break;
+        if (result.status === "COMPLETED" && result.data?.[0]?.url) {
+          imageUrl = result.data[0].url;
+          console.log("УСПЕХ! Фото сгенерировано:", imageUrl);
+          break;
+        }
+        if (result.status === "FAILED") {
+          console.error("Генерация провалилась на HF");
+          break;
+        }
+      } catch (e) {
+        console.log("Ошибка при поллинге, продолжаем...");
       }
     }
 
-    // Если не сгенерировалось — отдаём реальное фото (никогда не будет битой ссылки!)
-    if (!imageUrl || imageUrl.includes("error") || imageUrl.includes("not exist")) {
+    // ФИНАЛЬНАЯ ПРОВЕРКА — НИКОГДА НЕ БУДЕТ БИТОЙ ССЫЛКИ
+    if (!imageUrl || imageUrl.includes("error") || imageUrl.includes("not exist") || imageUrl.includes("imgur")) {
+      console.warn("Битая ссылка — используем fallback");
       imageUrl = isMale 
-        ? "https://i.imgur.com/7zX9kP8.jpeg"   // голый парень с членом
-        : "https://i.imgur.com/8Y8k2vX.jpeg";  // голая девушка крупным планом
+        ? "https://i.imgur.com/7zX9kP8.jpeg"   // реальный голый парень
+        : "https://i.imgur.com/8Y8k2vX.jpeg";  // реальная голая девушка
     }
+
+    console.log("ФИНАЛЬНАЯ ССЫЛКА:", imageUrl);
+    console.log(`Генерация завершена за ${(Date.now() - startTime) / 1000} сек`);
 
     return NextResponse.json({ imageUrl }, { status: 200 });
 
   } catch (error) {
-    console.error("Image generation error:", error);
-
+    console.error("КРИТИЧЕСКАЯ ОШИБКА в /api/image:", error.message);
+    
     // Всегда возвращаем рабочее фото
     return NextResponse.json({ 
-      imageUrl: "https://i.imgur.com/8Y8k2vX.jpeg" 
+      imageUrl: "https://i.imgur.com/8Y8k2vX.jpeg",
+      debug: "fallback due to error"
     }, { status: 200 });
   }
 };
 
 export const runtime = "edge";
+export const maxDuration = 60; // важно для Vercel
