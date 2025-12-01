@@ -1,52 +1,84 @@
-// app/api/chat/route.js  ← ЧИСТЫЙ ТЕСТ: только логи + один запрос к HF
-export const POST = async (req) => {
-  console.log("========================================");
-  console.log(" /api/chat ВЫЗВАН");
-  console.log("Токен в env:", !!process.env.HUGGINGFACE_API_TOKEN ? "ЕСТЬ" : "НЕТ");
-  console.log("Токен (первые 10 символов):", process.env.HUGGINGFACE_API_TOKEN?.slice(0,10) || "ПУСТО");
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
+const HF_CHAT_URL = "https://api-inference.huggingface.co/v1/chat/completions";
+
+export async function POST(req) {
   try {
     const body = await req.json();
-    console.log("Получен body:", body);
+    const { message, personality = {} } = body;
 
-    const { message = "привет", personality = {} } = body;
-    console.log("message:", message);
-    console.log("personality:", personality);
+    const token = process.env.HUGGINGFACE_API_TOKEN;
+    if (!token) {
+      console.error("❌ Missing HUGGINGFACE_API_TOKEN");
+      return Response.json({ reply: "Токен не найден на сервере." });
+    }
 
-    // Жёстко фиксированный запрос — только чтобы проверить, работает ли HF вообще
-    const res = await fetch("https://router.huggingface.co/v1/chat/completions", {
+    const {
+      gender = "Девушка",
+      orientation = "натурал",
+      nsfw = false,
+    } = personality;
+
+    // Personality generation
+    let roleDesc = "";
+    const isMale = gender === "Парень";
+
+    if (isMale) {
+      if (orientation === "гей") roleDesc = "ты гей-парень, любишь мужчин.";
+      else if (orientation === "би") roleDesc = "ты би-парень.";
+      else roleDesc = "ты натурал-парень.";
+    } else {
+      if (orientation === "лесби") roleDesc = "ты лесби-девочка.";
+      else if (orientation === "би") roleDesc = "ты би-девочка.";
+      else roleDesc = "ты натурал-девочка.";
+    }
+
+    const system = `Ты — Ника. ${roleDesc}
+${nsfw ? "Ты пошлая и говоришь откровенно." : "Ты нежная и романтичная."}
+Отвечай коротко, на русском, эмоционально.`;
+
+    // Compose messages
+    const messages = [
+      { role: "system", content: system },
+      { role: "user", content: message }
+    ];
+
+    // Request to HuggingFace Chat Completion API
+    const response = await fetch(HF_CHAT_URL, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.HUGGINGFACE_API_TOKEN}`,
-        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "google/gemma-2-9b-it:hf-inference",
-        messages: [
-          { role: "system", content: "Ты пошлый бот. Отвечай коротко и грязно на русском." },
-          { role: "user", content: message }
-        ],
-        max_tokens: 100,
-        temperature: 1.0,
+        model: "google/gemma-2-9b-it",
+        messages,
+        max_tokens: 300,
+        temperature: nsfw ? 1.0 : 0.7,
+        top_p: 0.95
       }),
     });
 
-    console.log("Статус ответа от HF:", res.status);
-    const text = await res.text();
-    console.log("Тело ответа от HF (полностью):", text.substring(0, 1000));
-
-    if (!res.ok) {
-      return new Response(JSON.stringify({ reply: `Ошибка HF ${res.status}: ${text}` }), { status: 200 });
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("❌ HF API Error:", errText);
+      return Response.json({
+        reply: nsfw ? "Ммм… подожди секундочку…" : "Я задумалась…"
+      });
     }
 
-    const data = JSON.parse(text);
-    const reply = data.choices?.[0]?.message?.content?.trim() || "пусто";
+    const data = await response.json();
+    const reply =
+      data?.choices?.[0]?.message?.content?.trim() ||
+      (nsfw ? "Ахх… продолжай…" : "Привет ❤️");
 
-    console.log("УСПЕХ! Ответ модели:", reply);
-    return new Response(JSON.stringify({ reply }), { status: 200 });
+    return Response.json({ reply });
 
-  } catch (err) {
-    console.error("Краш в /api/chat:", err);
-    return new Response(JSON.stringify({ reply: `Краш: ${err.message}` }), { status: 200 });
+  } catch (error) {
+    console.error("❌ Server crash:", error);
+    return Response.json({
+      reply: "Ой… я запуталась… но я рядом ❤️"
+    });
   }
-};
+}
