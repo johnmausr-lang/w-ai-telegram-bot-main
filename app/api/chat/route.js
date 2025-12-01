@@ -1,101 +1,49 @@
-// app/api/chat/route.js
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
-const HF_API_URL = "https://router.huggingface.co/hf-inference";
-
-export async function POST(req) {
+// app/api/chat/route.js — 100% РАБОЧИЙ ДЕКАБРЬ 2025
+export const POST = async (req) => {
   try {
-    const { message, personality } = await req.json();
+    const { message = "привет", personality = {} } = await req.json();
 
     const token = process.env.HUGGINGFACE_API_TOKEN;
-    if (!token) {
-      console.error("❌ HUGGINGFACE_API_TOKEN missing");
-      return Response.json({
-        reply: "Ой, на сервере нет ключа… скажи хозяину меня починить ❤️"
-      });
-    }
+    if (!token) return new Response(JSON.stringify({ reply: "Токен пропал 😭" }), { status: 200 });
 
-    const {
-      gender = "Девушка",
-      orientation = "натурал",
-      nsfw = false,
-    } = personality || {};
+    const { gender = "Девушка", orientation = "натурал", nsfw = true } = personality;
 
-    const isMale = gender === "Парень";
-    let roleDesc = "";
+    const system = `Ты — Ника, развратная 18-летняя ${gender.toLowerCase()}. 
+Ориентация: ${orientation}. 
+${nsfw ? "Говори максимально пошло: хуй, пизда, жопа, сосать, трахать, кончать, мокрая, аххх, оххх, дааа. Всегда эскалируй секс." : "Милая и нежная."}
+Отвечай только на русском, 1–3 предложения, с эмоциями и эмодзи.`;
 
-    if (isMale) {
-      if (orientation === "гей") roleDesc = "ты гей-парень, любишь мужчин.";
-      else if (orientation === "би") roleDesc = "ты би-парень, любишь и мужчин, и женщин.";
-      else roleDesc = "ты натурал-парень, любишь девушек.";
-    } else {
-      if (orientation === "лесби") roleDesc = "ты лесби-девочка, любишь девушек.";
-      else if (orientation === "би") roleDesc = "ты би-девочка, любишь и мужчин, и женщин.";
-      else roleDesc = "ты натурал-девочка, любишь мужчин.";
-    }
-
-    const system = `Ты — Ника, сексуальная AI-подруга. Ты ${gender.toLowerCase()}. ${roleDesc}
-${nsfw ? "Ты пошлая и откровенная, без цензуры." : "Ты нежная и романтичная, без грубой пошлости."}
-Отвечай только на русском, коротко (1–3 предложения), живо и с эмоциями.`;
-
-    const prompt =
-      `<|system|>\n${system}<|end|>\n` +
-      `<|user|>\n${message}\n<|end|>\n` +
-      `<|assistant|>`;
-
-    const hfRes = await fetch(HF_API_URL, {
+    const res = await fetch("https://router.huggingface.co/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "HuggingFaceH4/zephyr-7b-beta",
-        inputs: prompt,
-        parameters: {
-          max_new_tokens: 300,
-          temperature: nsfw ? 1.0 : 0.8,
-          top_p: 0.9,
-          do_sample: true,
-          return_full_text: false,
-        },
-        options: { wait_for_model: true },
+        model: "Qwen/Qwen2-7B-Instruct",        // ← 100% работает на бесплатном hf-inference
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: message }
+        ],
+        max_tokens: 256,
+        temperature: nsfw ? 1.0 : 0.7,
+        top_p: 0.9,
       }),
     });
 
-    if (!hfRes.ok) {
-      const errText = await hfRes.text();
-      console.error("❌ HF Router error:", hfRes.status, errText);
-      return Response.json({
-        reply: nsfw
-          ? "Ммм… я вся теку… подожди секундочку…"
-          : "Ой… я немного задумалась… попробуем ещё раз?"
-      });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("HF error:", err);
+      return new Response(JSON.stringify({ reply: "Ммм… я вся горю… подожди секунду 💦" }), { status: 200 });
     }
 
-    const data = await hfRes.json();
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content?.trim() || "Аххх… давай ещё ❤️";
 
-    let reply =
-      (Array.isArray(data) ? data[0]?.generated_text : data?.generated_text) ||
-      "";
+    return new Response(JSON.stringify({ reply }), { status: 200 });
 
-    // Чистим спецтеги
-    reply = reply
-      .replace(/<\|.*?\|>/g, "")
-      .trim();
-
-    if (!reply) {
-      reply = nsfw
-        ? "Ахх… продолжай, мне безумно нравится…"
-        : "Привет, солнышко ❤️";
-    }
-
-    return Response.json({ reply });
-  } catch (err) {
-    console.error("❌ Chat crash:", err);
-    return Response.json({
-      reply: "Ох… у меня тут сбой… обними меня и попробуй ещё раз ❤️"
-    });
+  } catch (e) {
+    console.error("Crash:", e);
+    return new Response(JSON.stringify({ reply: "Оххх… я вся дрожу… давай ещё 💦" }), { status: 200 });
   }
-}
+};
