@@ -1,50 +1,77 @@
-// app/api/chat/route.js — 100% РАБОЧИЙ ДЕКАБРЬ 2025
+const HF_CHAT_URL = "https://api-inference.huggingface.co/v1/chat/completions";
+
 export const POST = async (req) => {
   try {
-    const { message = "привет", personality = {} } = await req.json();
+    const { message, personality } = await req.json();
     const token = process.env.HUGGINGFACE_API_TOKEN;
 
     if (!token) {
-      return new Response(JSON.stringify({ reply: "Токен пропал 😭" }), { status: 200 });
+      console.error("HUGGINGFACE_API_TOKEN missing");
+      return new Response(JSON.stringify({
+        reply: "Ой… я потерялась… попробуй ещё ❤️"
+      }));
     }
 
-    const { gender = "Девушка", orientation = "натурал", nsfw = true } = personality;
+    const { gender = "Девушка", orientation = "натурал", nsfw = false } = personality || {};
 
-    const system = `Ты — Ника, 18-летняя развратная ${gender.toLowerCase()}. Ориентация: ${orientation}.
-${nsfw ? "Говори максимально пошло: хуй, пизда, жопа, сосать, трахать, кончать, мокрая, аххх, оххх, дааа, блядь. Всегда эскалируй секс." : "Ты милая и нежная."}
-Отвечай ТОЛЬКО на русском, 1–3 предложения, с эмоциями и эмодзи.`;
+    const isMale = gender === "Парень";
 
-    const res = await fetch("https://api.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct", {
+    let roleDesc = "";
+    if (isMale) {
+      if (orientation === "гей") roleDesc = "ты гей-парень, любишь мужчин.";
+      else if (orientation === "би") roleDesc = "ты би-парень, любишь и мужчин, и женщин.";
+      else roleDesc = "ты натурал-парень, любишь девушек.";
+    } else {
+      if (orientation === "лесби") roleDesc = "ты лесби-девочка, любишь девушек.";
+      else if (orientation === "би") roleDesc = "ты би-девочка, любишь и мужчин, и женщин.";
+      else roleDesc = "ты натурал-девочка, любишь мужчин.";
+    }
+
+    const system = `Ты — Ника, сексуальная AI-подруга. Ты ${gender.toLowerCase()}. ${roleDesc}
+${nsfw ? "Ты пошлая, без цензуры." : "Ты нежная и романтичная."}
+Отвечай коротко, на русском, эмоционально.`;
+
+    const messages = [
+      { role: "system", content: system },
+      { role: "user", content: message }
+    ];
+
+    const res = await fetch(HF_CHAT_URL, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        inputs: `<|im_start|>system\n${system}<|im_end|>\n<|im_start|>user\n${message}<|im_end|>\n<|im_start|>assistant\n`,
-        parameters: {
-          max_new_tokens: 256,
-          temperature: nsfw ? 1.0 : 0.7,
-          top_p: 0.9,
-          do_sample: true,
-          return_full_text: false
-        }
-      }),
+        model: "google/gemma-2-9b-it",
+        messages,
+        temperature: nsfw ? 1.1 : 0.7,
+        max_tokens: 300,
+        top_p: 0.95,
+        stream: false,
+      })
     });
 
     if (!res.ok) {
       const err = await res.text();
-      console.error("HF error:", err);
-      return new Response(JSON.stringify({ reply: "Ммм… я вся горю… подожди секунду 💦" }), { status: 200 });
+      console.error("HF API error:", err);
+      return new Response(JSON.stringify({
+        reply: nsfw ? "Ммм… я разогреваюсь…" : "Ой… что-то не то. Попробуй ещё ❤️"
+      }));
     }
 
     const data = await res.json();
-    const reply = (Array.isArray(data) ? data[0].generated_text : data.generated_text || "").trim();
+    const reply = data?.choices?.[0]?.message?.content?.trim()
+      || (nsfw ? "Ахх… продолжай…" : "Приветик ❤️");
 
-    return new Response(JSON.stringify({ reply: reply || "Аххх… давай ещё ❤️" }), { status: 200 });
+    return new Response(JSON.stringify({ reply }), {
+      headers: { "Content-Type": "application/json" }
+    });
 
-  } catch (e) {
-    console.error("Crash:", e);
-    return new Response(JSON.stringify({ reply: "Оххх… я вся дрожу… давай ещё 💦" }), { status: 200 });
+  } catch (err) {
+    console.error("Crash:", err);
+    return new Response(JSON.stringify({
+      reply: "Ой… я запуталась… но я рядом ❤️"
+    }));
   }
 };
