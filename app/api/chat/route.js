@@ -1,4 +1,4 @@
-// app/api/chat/route.js  ← ОФИЦИАЛЬНЫЙ HF ROUTER 2025: OpenAI-compatible (без deprecated, 100% работает)
+// app/api/chat/route.js  ← Llama-3-8B-Instruct на HF Router (стабильно, бесплатно, без deprecated, максимально горячо)
 const HF_CHAT_URL = "https://router.huggingface.co/v1/chat/completions";
 
 export const POST = async (req) => {
@@ -35,7 +35,7 @@ ${isNSFW
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "HuggingFaceH4/zephyr-7b-beta:hf-inference",  // Модель + провайдер (CPU, бесплатно)
+        model: "meta-llama/Meta-Llama-3-8B-Instruct:hf-inference",  // Стабильная модель + провайдер (CPU, бесплатно)
         messages: messages,
         max_tokens: 300,
         temperature: isNSFW ? 1.0 : 0.8,
@@ -46,7 +46,7 @@ ${isNSFW
 
     if (!res.ok) {
       const err = await res.text();
-      console.error("HF Router 2025 error:", err);
+      console.error("HF Router error:", err);
       return new Response(JSON.stringify({ reply: isNSFW ? "Ммм… я вся горю… подожди секунду" : "Ой, задумалась…" }), { 
         status: 200, 
         headers: { "Content-Type": "application/json" } 
@@ -60,7 +60,7 @@ ${isNSFW
       reply = isNSFW ? "Аххх… давай ещё, я хочу тебя…" : "Привет, солнышко ❤️";
     }
 
-    console.log("HF Router Success:", reply.substring(0, 50) + "...");
+    console.log("HF Llama Success:", reply.substring(0, 50) + "...");
 
     return new Response(JSON.stringify({ reply }), { 
       status: 200, 
