@@ -5,7 +5,6 @@ import { Heart, MessageCircle, Camera, ChevronLeft } from "lucide-react";
 
 export default function NeonGlowAI() {
   const [step, setStep] = useState("welcome");
-
   const [personality, setPersonality] = useState({
     gender: null,
     orientation: null,
@@ -21,6 +20,7 @@ export default function NeonGlowAI() {
   const messagesEndRef = useRef(null);
   const audioRef = useRef(null);
 
+  // Автопрокрутка
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -32,24 +32,26 @@ export default function NeonGlowAI() {
     }
   }, []);
 
-  // TTS
+  // === TTS (голос) ===
   const speak = useCallback(async (text) => {
-    if (!text) return;
+    if (!text || !text.trim()) return;
     try {
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: personality.nsfw ? "shimmer" : "nova" }),
+        body: JSON.stringify({ text, voice: "shimmer" }),
       });
       if (!res.ok) return;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      audioRef.current.src = url;
-      audioRef.current.play().catch(() => {});
+      if (audioRef.current) {
+        audioRef.current.src = url;
+        audioRef.current.play().catch(() => {});
+      }
     } catch (e) {}
-  }, [personality.nsfw]);
+  }, []);
 
-  // Чат
+  // === Чат со стримингом ===
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
     const userMsg = input.trim();
@@ -99,13 +101,14 @@ export default function NeonGlowAI() {
         }
       }
 
+      // Озвучиваем ответ
       const reply = messages[messages.length - 1]?.content || "";
       if (reply) speak(reply);
 
     } catch (err) {
       setMessages(prev => {
         const arr = [...prev];
-        arr[arr.length - 1].content = "Ой, я запуталась… попробуй ещё раз";
+        arr[arr.length - 1].content = "Ой, что-то пошло не так… попробуй ещё раз";
         return arr;
       });
     } finally {
@@ -113,7 +116,7 @@ export default function NeonGlowAI() {
     }
   };
 
-  // Генерация фото
+  // === Генерация фото ===
   const generatePhoto = async () => {
     if (generatingPhoto) return;
     setGeneratingPhoto(true);
@@ -134,7 +137,9 @@ export default function NeonGlowAI() {
             .concat({ role: "assistant", content: imageUrl, type: "image" })
       );
     } catch (e) {
-      setMessages(prev => [...prev, { role: "assistant", content: "Не получилось... попробуй ещё раз" }]);
+      setMessages(prev => prev.filter(m => m.content !== "Генерирую горячее фото... (15–25 сек)")
+        .concat({ role: "assistant", content: "Не получилось сгенерировать... попробуй ещё" })
+      );
     } finally {
       setGeneratingPhoto(false);
     }
@@ -148,7 +153,7 @@ export default function NeonGlowAI() {
       <audio ref={audioRef} />
 
       <AnimatePresence mode="wait">
-        {/* WELCOME */}
+        {/* === ОНБОРДИНГ === */}
         {step === "welcome" && (
           <motion.div key="welcome" className="flex-1 flex flex-col items-center justify-center px-6 gap-10 text-center">
             <motion.h1
@@ -166,7 +171,6 @@ export default function NeonGlowAI() {
           </motion.div>
         )}
 
-        {/* GENDER */}
         {step === "gender" && (
           <motion.div key="gender" className="flex-1 flex flex-col items-center justify-center gap-12 px-6">
             <h2 className="text-4xl sm:text-5xl font-bold text-center">Кто будет твоим AI?</h2>
@@ -179,7 +183,6 @@ export default function NeonGlowAI() {
           </motion.div>
         )}
 
-        {/* ORIENTATION */}
         {step === "orientation" && (
           <motion.div key="orient" className="flex-1 flex flex-col items-center justify-center gap-12 px-6">
             <h2 className="text-4xl sm:text-5xl font-bold text-center">Ориентация</h2>
@@ -196,7 +199,6 @@ export default function NeonGlowAI() {
           </motion.div>
         )}
 
-        {/* STYLE */}
         {step === "style" && (
           <motion.div key="style" className="flex-1 flex flex-col items-center justify-center gap-12 px-6">
             <h2 className="text-4xl sm:text-5xl font-bold text-center">Стиль общения</h2>
@@ -212,7 +214,7 @@ export default function NeonGlowAI() {
           </motion.div>
         )}
 
-        {/* ЧАТ */}
+        {/* === ЧАТ === */}
         {step === "chat" && (
           <div className="flex flex-col h-screen">
             <div className="flex-1 overflow-y-auto px-4 pt-4 pb-36 space-y-5">
@@ -229,7 +231,13 @@ export default function NeonGlowAI() {
                       : "bg-gradient-to-r from-pink-700 to-purple-700"
                   }`}>
                     {m.type === "image" ? (
-                      <img src={m.content} alt="18+" className="rounded-2xl max-w-full h-auto border-4 border-white/20 shadow-xl" />
+                      // КРАСИВОЕ ФОТО НОРМАЛЬНОГО РАЗМЕРА
+                      <img 
+                        src={m.content} 
+                        alt="18+" 
+                        className="rounded-2xl w-full max-w-xs sm:max-w-sm mx-auto border-4 border-purple-500/60 shadow-2xl"
+                        loading="lazy"
+                      />
                     ) : (
                       <p className="text-base sm:text-lg leading-relaxed">{m.content || "..."}</p>
                     )}
@@ -239,6 +247,7 @@ export default function NeonGlowAI() {
               <div ref={messagesEndRef} />
             </div>
 
+            {/* Нижняя панель */}
             <div className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-white/10">
               <div className="p-4 flex items-end gap-3">
                 <textarea
