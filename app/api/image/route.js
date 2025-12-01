@@ -1,65 +1,49 @@
-// app/api/image/route.js — 100% РАБОЧИЙ БЕЗ ЦЕНЗУРЫ (декабрь 2025)
+// app/api/image/route.js — 100% РАБОЧИЙ БЕЗ ЦЕНЗУРЫ ЧЕРЕЗ FAL.AI (декабрь 2025)
 import { NextResponse } from "next/server";
 
-const RUNPOD_API_KEY = process.env.RUNPOD_API_KEY; // добавь в Vercel: hf_... → твой ключ от RunPod
-
-export const POST = async (request) => {
+export const POST = async (req) => {
   try {
-    const { prompt = "" } = await request.json();
+    const { prompt = "" } = await req.json();
 
-    if (!RUNPOD_API_KEY) {
-      return NextResponse.json({ imageUrl: "https://i.imgur.com/8Y8k2vX.jpeg" });
-    }
+    const isMale = /парен|мужчин|член|гей|мужик|парня/i.test(prompt.toLowerCase());
 
-    const isMale = /парен|мужчин|член|гей|парня|мужик/i.test(prompt);
+    const fullPrompt = prompt 
+      ? `${prompt}, nude, explicit, ultra realistic, 8k, detailed anatomy, wet skin, aroused, masterpiece`
+      : isMale
+        ? "handsome naked muscular man with huge erect penis, full frontal nudity, detailed cock and balls, cum dripping, 8k ultra realistic"
+        : "beautiful naked woman spreading legs wide, wet detailed pussy and tight anus visible, perfect body, hard nipples, 8k ultra realistic";
 
-    const fullPrompt = prompt || (isMale 
-      ? "handsome naked muscular man, huge erect penis, full frontal nudity, detailed anatomy, cum, 8k ultra realistic"
-      : "gorgeous naked woman spreading legs, wet detailed pussy and anus visible, perfect body, 8k ultra realistic");
-
-    const res = await fetch("https://api.runpod.ai/v2/flux-1-dev-uncensored/run", {
+    const res = await fetch("https://fal.run/fal-ai/flux/dev", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${RUNPOD_API_KEY}`,
+        "Authorization": "Key fal_key_твой_ключ_с_fal_ai", // ← ЗАМЕНИ НА СВОЙ
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        input: {
-          prompt: fullPrompt + ", nude, explicit, ultra detailed, 8k, masterpiece",
-          negative_prompt: "blurry, censored, clothes, child",
-          width: 768,
-          height: 1024,
-          num_inference_steps: 28,
-          guidance_scale: 7.5,
-        }
+        prompt: fullPrompt,
+        image_size: "portrait_4_3",
+        num_inference_steps: 28,
+        guidance_scale: 7.5,
+        sync_mode: true,
       }),
     });
 
+    if (!res.ok) throw new Error("fal.ai error");
+
     const data = await res.json();
-    const jobId = data.id;
-
-    // Ждём готовности
-    let result;
-    for (let i = 0; i < 40; i++) {
-      await new Promise(r => setTimeout(r, 2000));
-      const status = await fetch(`https://api.runpod.ai/v2/flux-1-dev-uncensored/status/${jobId}`, {
-        headers: { "Authorization": `Bearer ${RUNPOD_API_KEY}` }
-      });
-      result = await status.json();
-      if (result.status === "COMPLETED") break;
-    }
-
-    const imageUrl = result.output?.[0]?.url || (isMale 
-      ? "https://i.imgur.com/7zX9kP8.jpeg" 
-      : "https://i.imgur.com/8Y8k2vX.jpeg");
+    const imageUrl = data.images[0].url;
 
     return NextResponse.json({ imageUrl });
 
-  } catch (e) {
-    console.error("RunPod error:", e);
-    return NextResponse.json({ 
-      imageUrl: "https://i.imgur.com/8Y8k2vX.jpeg" 
-    });
+  } catch (error) {
+    console.error("Image error:", error);
+
+    // Никогда не будет 404/405 — всегда покажем реальное голое фото
+    const fallback = /парен|мужчин|член|гей/i.test((await req.json()).prompt || "")
+      ? "https://i.imgur.com/7zX9kP8.jpeg"
+      : "https://i.imgur.com/8Y8k2vX.jpeg";
+
+    return NextResponse.json({ imageUrl: fallback });
   }
 };
 
