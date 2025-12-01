@@ -1,4 +1,3 @@
-// app/api/chat/route.js  ← Полная поддержка ролей + ориентаций (Llama-3-8B-Instruct, 100% работает)
 const HF_CHAT_URL = "https://router.huggingface.co/v1/chat/completions";
 
 export const POST = async (req) => {
