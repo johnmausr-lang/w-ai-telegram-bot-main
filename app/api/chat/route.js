@@ -1,4 +1,4 @@
-const HF_CHAT_URL = "https://api-inference.huggingface.co/v1/chat/completions";
+const HF_URL = "https://router.huggingface.co/v1/chat/completions";
 
 export const POST = async (req) => {
   try {
@@ -6,72 +6,42 @@ export const POST = async (req) => {
     const token = process.env.HUGGINGFACE_API_TOKEN;
 
     if (!token) {
-      console.error("HUGGINGFACE_API_TOKEN missing");
-      return new Response(JSON.stringify({
-        reply: "Ой… я потерялась… попробуй ещё ❤️"
-      }));
+      console.error("NO TOKEN");
+      return Response.json({ reply: "Токен не найден 🤷‍♀️" });
     }
 
-    const { gender = "Девушка", orientation = "натурал", nsfw = false } = personality || {};
+    const system = `Ты — Ника, милая подруга. Отвечай коротко и по делу.`;
 
-    const isMale = gender === "Парень";
-
-    let roleDesc = "";
-    if (isMale) {
-      if (orientation === "гей") roleDesc = "ты гей-парень, любишь мужчин.";
-      else if (orientation === "би") roleDesc = "ты би-парень, любишь и мужчин, и женщин.";
-      else roleDesc = "ты натурал-парень, любишь девушек.";
-    } else {
-      if (orientation === "лесби") roleDesc = "ты лесби-девочка, любишь девушек.";
-      else if (orientation === "би") roleDesc = "ты би-девочка, любишь и мужчин, и женщин.";
-      else roleDesc = "ты натурал-девочка, любишь мужчин.";
-    }
-
-    const system = `Ты — Ника, сексуальная AI-подруга. Ты ${gender.toLowerCase()}. ${roleDesc}
-${nsfw ? "Ты пошлая, без цензуры." : "Ты нежная и романтичная."}
-Отвечай коротко, на русском, эмоционально.`;
-
-    const messages = [
-      { role: "system", content: system },
-      { role: "user", content: message }
-    ];
-
-    const res = await fetch(HF_CHAT_URL, {
+    const res = await fetch(HF_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemma-2-9b-it",
-        messages,
-        temperature: nsfw ? 1.1 : 0.7,
+        model: "meta-llama/Llama-3.1-8B-Instruct", // ✔ поддерживается!
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: message }
+        ],
         max_tokens: 300,
-        top_p: 0.95,
-        stream: false,
+        temperature: 0.7
       })
     });
 
     if (!res.ok) {
-      const err = await res.text();
-      console.error("HF API error:", err);
-      return new Response(JSON.stringify({
-        reply: nsfw ? "Ммм… я разогреваюсь…" : "Ой… что-то не то. Попробуй ещё ❤️"
-      }));
+      const txt = await res.text();
+      console.error("HF ERROR:", txt);
+      return Response.json({ reply: "Ой… попробуй ещё ❤️" });
     }
 
     const data = await res.json();
-    const reply = data?.choices?.[0]?.message?.content?.trim()
-      || (nsfw ? "Ахх… продолжай…" : "Приветик ❤️");
+    const reply = data?.choices?.[0]?.message?.content ?? "❤️";
 
-    return new Response(JSON.stringify({ reply }), {
-      headers: { "Content-Type": "application/json" }
-    });
+    return Response.json({ reply });
 
-  } catch (err) {
-    console.error("Crash:", err);
-    return new Response(JSON.stringify({
-      reply: "Ой… я запуталась… но я рядом ❤️"
-    }));
+  } catch (e) {
+    console.error("Crash:", e);
+    return Response.json({ reply: "Я запуталась 😵‍💫" });
   }
 };
