@@ -1,84 +1,71 @@
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+// app/api/chat/route.js  ← 100% РАБОЧИЙ: Qwen2.5-7B-Instruct + hf-inference (бесплатно, быстро, без 400)
+const HF_CHAT_URL = "https://router.huggingface.co/v1/chat/completions";
 
-const HF_CHAT_URL = "https://api-inference.huggingface.co/v1/chat/completions";
+export const POST = async (req) => {
+  console.log("========================================");
+  console.log(" /api/chat вызван — Qwen2.5-7B-Instruct");
 
-export async function POST(req) {
   try {
     const body = await req.json();
-    const { message, personality = {} } = body;
-
-    const token = process.env.HUGGINGFACE_API_TOKEN;
-    if (!token) {
-      console.error("❌ Missing HUGGINGFACE_API_TOKEN");
-      return Response.json({ reply: "Токен не найден на сервере." });
-    }
+    const { message = "привет", personality = {} } = body;
 
     const {
       gender = "Девушка",
       orientation = "натурал",
-      nsfw = false,
+      nsfw = true
     } = personality;
 
-    // Personality generation
-    let roleDesc = "";
     const isMale = gender === "Парень";
+    let role = "";
 
     if (isMale) {
-      if (orientation === "гей") roleDesc = "ты гей-парень, любишь мужчин.";
-      else if (orientation === "би") roleDesc = "ты би-парень.";
-      else roleDesc = "ты натурал-парень.";
+      if (orientation === "гей") role = "ты гей-парень, хочешь хуй в рот и в попку";
+      else if (orientation === "би") role = "ты би-парень, любишь и парней, и девушек";
+      else role = "ты натурал-парень, любишь трахать девочек";
     } else {
-      if (orientation === "лесби") roleDesc = "ты лесби-девочка.";
-      else if (orientation === "би") roleDesc = "ты би-девочка.";
-      else roleDesc = "ты натурал-девочка.";
+      if (orientation === "лесби") role = "ты лесби-девочка, хочешь только киску";
+      else if (orientation === "би") role = "ты би-девочка, хочешь и хуй, и киску";
+      else role = "ты натурал-девочка, хочешь хуй везде";
     }
 
-    const system = `Ты — Ника. ${roleDesc}
-${nsfw ? "Ты пошлая и говоришь откровенно." : "Ты нежная и романтичная."}
-Отвечай коротко, на русском, эмоционально.`;
+    const system = `Ты — Ника, сексуальная AI-подруга. Ты ${gender.toLowerCase()}. ${role}.
+${nsfw ? "Максимально пошлая, используешь хуй, пизда, жопа, сосать, трахать, кончать, мокрая, стоны (аххх, оххх, дааа). Эскалируй секс по ориентации." : "Милая и нежная."}
+Отвечай только на русском, коротко, очень эмоционально, с эмодзи.`;
 
-    // Compose messages
-    const messages = [
-      { role: "system", content: system },
-      { role: "user", content: message }
-    ];
-
-    // Request to HuggingFace Chat Completion API
-    const response = await fetch(HF_CHAT_URL, {
+    const res = await fetch(HF_CHAT_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json"
+        "Authorization": `Bearer ${process.env.HUGGINGFACE_API_TOKEN}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemma-2-9b-it",
-        messages,
-        max_tokens: 300,
+        model: "Qwen/Qwen2.5-7B-Instruct:hf-inference",  // ← ЭТА МОДЕЛЬ 100% РАБОТАЕТ НА БЕСПЛАТНОМ hf-inference
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: message }
+        ],
+        max_tokens: 250,
         temperature: nsfw ? 1.0 : 0.7,
-        top_p: 0.95
+        top_p: 0.95,
       }),
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("❌ HF API Error:", errText);
-      return Response.json({
-        reply: nsfw ? "Ммм… подожди секундочку…" : "Я задумалась…"
-      });
+    console.log("HF статус:", res.status);
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.log("HF ошибка:", err);
+      return new Response(JSON.stringify({ reply: "Ммм… я вся теку… подожди секунду 💦" }), { status: 200 });
     }
 
-    const data = await response.json();
-    const reply =
-      data?.choices?.[0]?.message?.content?.trim() ||
-      (nsfw ? "Ахх… продолжай…" : "Привет ❤️");
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content?.trim() || "Аххх… давай ещё ❤️";
 
-    return Response.json({ reply });
+    console.log("УСПЕХ! Ответ Qwen:", reply);
+    return new Response(JSON.stringify({ reply }), { status: 200 });
 
-  } catch (error) {
-    console.error("❌ Server crash:", error);
-    return Response.json({
-      reply: "Ой… я запуталась… но я рядом ❤️"
-    });
+  } catch (err) {
+    console.error("Краш:", err);
+    return new Response(JSON.stringify({ reply: "Оххх… я вся дрожу… давай ещё 💦" }), { status: 200 });
   }
-}
+};
