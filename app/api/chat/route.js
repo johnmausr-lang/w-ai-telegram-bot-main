@@ -1,4 +1,5 @@
 // app/api/chat/route.js  — исправленный под настоящий HF Chat Completion API
+export const runtime = "nodejs";
 const HF_CHAT_URL = "https://api-inference.huggingface.co/v1/chat/completions";
 
 export const POST = async (req) => {
