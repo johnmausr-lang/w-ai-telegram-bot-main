@@ -1,19 +1,20 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, MessageCircle, Camera, ChevronLeft } from "lucide-react";
+import { Sparkles, Heart, MessageCircle, Camera, ChevronLeft } from "lucide-react";
 
 export default function NeonGlowAI() {
   const [step, setStep] = useState("welcome");
 
   const [personality, setPersonality] = useState({
     gender: null,           // "Женщина" | "Мужчина"
-    orientation: null,      // "натурал" | "би" | "гей"/"лесби"
-    style: "нежная",        // нежная | дерзкая | покорная | доминантная
+    orientation: null,      // "натурал" | "би" | "лесби"/"гей"
+    style: "нежная",
+    intensity: 80,
     nsfw: true,
   });
 
-  const [messages, setMessages] = useState([]); // { role: "user"|"assistant", content: string, type?: "image" }
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [generatingPhoto, setGeneratingPhoto] = useState(false);
@@ -21,7 +22,6 @@ export default function NeonGlowAI() {
   const messagesEndRef = useRef(null);
   const audioRef = useRef(null);
 
-  // Автопрокрутка
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -33,7 +33,6 @@ export default function NeonGlowAI() {
     }
   }, []);
 
-  // TTS (необязательно, но работает)
   const speak = useCallback(async (text) => {
     if (!text) return;
     try {
@@ -50,7 +49,7 @@ export default function NeonGlowAI() {
     } catch (e) {}
   }, [personality.nsfw]);
 
-  // Чат со стримингом
+  // СТРИМИНГ ЧАТА (без ошибок)
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
     const userMsg = input.trim();
@@ -106,7 +105,7 @@ export default function NeonGlowAI() {
     } catch (err) {
       setMessages(prev => {
         const arr = [...prev];
-        arr[arr.length - 1].content = "Ой, что-то пошло не так… попробуй ещё раз";
+        arr[arr.length - 1].content = "Ой, я запуталась… попробуй ещё раз";
         return arr;
       });
     } finally {
@@ -114,25 +113,23 @@ export default function NeonGlowAI() {
     }
   };
 
-  // ГЕНЕРАЦИЯ ГОЛЫХ ФОТО — ДЕВУШКИ И ПАРНИ
+  // ГЕНЕРАЦИЯ ГОЛЫХ ФОТО (парни и девушки!)
   const generatePhoto = async () => {
     if (generatingPhoto) return;
     setGeneratingPhoto(true);
 
-    setMessages(prev => [...prev, { role: "assistant", content: "Секунду, делаю горячее фото..." }]);
+    setMessages(prev => [...prev, { role: "assistant", content: "Генерирую горячее фото... (15–20 сек)" }]);
 
     try {
-      let prompt = input.trim() || "";
+      let prompt = input.trim();
 
-      // Формируем промпт в зависимости от пола AI
+      // Автоматически добавляем нужный пол
       if (personality.gender === "Мужчина") {
-        prompt = prompt
-          ? `${prompt}, naked handsome man, muscular body, erect penis, full frontal nudity, detailed anatomy, 8k, ultra realistic, cinematic lighting`
-          : "beautiful naked man with hard cock, muscular, full frontal, detailed penis and balls, wet skin, 8k, masterpiece";
+        prompt = prompt ? `${prompt}, naked handsome man, muscular, erect penis visible, detailed anatomy, 8k` :
+          "handsome naked man with hard cock, full frontal nudity, detailed muscles, 8k, ultra realistic";
       } else {
-        prompt = prompt
-          ? `${prompt}, beautiful naked woman, spreading legs, wet pussy visible, detailed labia and anus, aroused, 8k, ultra realistic`
-          : "gorgeous naked girl spreading legs wide, showing wet pussy and asshole, perfect body, 8k, ultra detailed, wet skin";
+        prompt = prompt ? `${prompt}, beautiful naked woman, spreading legs, detailed pussy, wet, aroused, 8k` :
+          "gorgeous naked girl spreading legs, showing pussy and anus, ultra detailed, 8k, wet skin";
       }
 
       const res = await fetch("/api/image", {
@@ -144,60 +141,50 @@ export default function NeonGlowAI() {
       const data = await res.json();
 
       setMessages(prev => {
-        // Убираем сообщение "делаю фото..."
-        const filtered = prev.filter(m => m.content !== "Секунду, делаю горячее фото...");
+        const filtered = prev.filter(m => m.content !== "Генерирую горячее фото... (15–20 сек)");
         if (data.imageUrl) {
           filtered.push({ role: "assistant", content: data.imageUrl, type: "image" });
         } else {
-          filtered.push({ role: "assistant", content: "Не получилось сгенерировать фото... попробуй ещё" });
+          filtered.push({ role: "assistant", content: "Не смогла сгенерировать фото... попробуй ещё раз" });
         }
         return filtered;
       });
 
     } catch (e) {
-      setMessages(prev => [...prev, { role: "assistant", content: "Ошибка при генерации фото..." }]);
+      setMessages(prev => [...prev, { role: "assistant", content: "Ошибка генерации фото..." }]);
     } finally {
       setGeneratingPhoto(false);
     }
   };
 
   const undoLastMessage = () => setMessages(prev => prev.length >= 2 ? prev.slice(0, -2) : prev);
-
   const resetChat = () => {
     setMessages([]);
     setStep("welcome");
   };
 
   return (
-    <div className="min-h-screen flex flex-col overflow-hidden bg-gradient-to-b from-purple-900 via-pink-900 to-black">
+    <div className="min-h-screen flex flex-col overflow-hidden neon-bg">
       <audio ref={audioRef} />
 
       <AnimatePresence mode="wait">
-        {/* === WELCOME === */}
         {step === "welcome" && (
-          <motion.div key="welcome" className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-10">
-            <motion.h1
-              animate={{ scale: [1, 1.06, 1] }}
-              transition={{ repeat: Infinity, duration: 4 }}
-              className="text-6xl md:text-8xl font-bold bg-gradient-to-r from-pink-400 to-purple-600 bg-clip-text text-transparent"
-            >
-              Твой AI 18+
+          <motion.div key="welcome" className="flex-1 flex flex-col items-center justify-center text-center px-6 gap-8">
+            <motion.h1 animate={{ scale: [1, 1.05, 1] }} transition={{ repeat: Infinity, duration: 3 }}
+              className="text-6xl md:text-8xl font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">
+              Твой AI
             </motion.h1>
-            <p className="text-2xl text-white/80">Без цензуры • Голос • Голые фото</p>
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              onClick={() => setStep("gender")}
-              className="px-12 py-6 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-3xl font-bold shadow-2xl"
-            >
+            <p className="text-2xl opacity-90">18+ спутник без цензуры</p>
+            <motion.button whileHover={{ scale: 1.1 }} onClick={() => setStep("gender")}
+              className="px-12 py-6 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-3xl font-bold pulse-glow">
               Начать
             </motion.button>
           </motion.div>
         )}
 
-        {/* === GENDER === */}
         {step === "gender" && (
           <motion.div key="gender" className="flex-1 flex flex-col items-center justify-center gap-12 px-6">
-            <h2 className="text-5xl font-bold text-white">Кто будет твоим AI?</h2>
+            <h2 className="text-5xl font-bold">Кто будет твоим AI?</h2>
             <div className="flex gap-8">
               <motion.button whileHover={{ scale: 1.1 }} onClick={() => { setPersonality(p => ({...p, gender: "Женщина"})); setStep("orientation"); }}
                 className="px-12 py-6 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-2xl font-bold">Девушка</motion.button>
@@ -207,15 +194,14 @@ export default function NeonGlowAI() {
           </motion.div>
         )}
 
-        {/* === ORIENTATION === */}
         {step === "orientation" && (
           <motion.div key="orient" className="flex-1 flex flex-col items-center justify-center gap-12 px-6">
-            <h2 className="text-5xl font-bold text-white text-center">Ориентация</h2>
+            <h2 className="text-5xl font-bold text-center">Ориентация</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <motion.button whileHover={{ scale: 1.1 }} onClick={() => { setPersonality(p => ({...p, orientation: "натурал"})); setStep("style"); }}
-                className="px-10 py-5 rounded-full bg-pink-600 text-xl font-bold">Натурал</motion.button>
+                className="px-10 py-5 rounded-full bg-pink-500 text-xl font-bold">Натурал</motion.button>
               <motion.button whileHover={{ scale: 1.1 }} onClick={() => { setPersonality(p => ({...p, orientation: "би"})); setStep("style"); }}
-                className="px-10 py-5 rounded-full bg-purple-600 text-xl font-bold">Би</motion.button>
+                className="px-10 py-5 rounded-full bg-purple-500 text-xl font-bold">Би</motion.button>
               <motion.button whileHover={{ scale: 1.1 }} onClick={() => { setPersonality(p => ({...p, orientation: p.gender === "Мужчина" ? "гей" : "лесби"})); setStep("style"); }}
                 className="px-10 py-5 rounded-full bg-red-600 text-xl font-bold">
                 {personality.gender === "Мужчина" ? "Гей" : "Лесби"}
@@ -224,18 +210,13 @@ export default function NeonGlowAI() {
           </motion.div>
         )}
 
-        {/* === STYLE === */}
         {step === "style" && (
           <motion.div key="style" className="flex-1 flex flex-col items-center justify-center gap-12 px-6">
-            <h2 className="text-5xl font-bold text-white text-center">Стиль общения</h2>
+            <h2 className="text-5xl font-bold text-center">Стиль общения</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {["нежная", "дерзкая", "покорная", "доминантная"].map(s => (
-                <motion.button
-                  key={s}
-                  whileHover={{ scale: 1.1 }}
-                  onClick={() => { setPersonality(p => ({...p, style: s})); setStep("chat"); }}
-                  className="px-8 py-5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-xl font-bold capitalize"
-                >
+                <motion.button key={s} whileHover={{ scale: 1.1 }} onClick={() => { setPersonality(p => ({...p, style: s})); setStep("chat"); }}
+                  className="px-8 py-5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-xl font-bold capitalize">
                   {s === "нежная" ? "Нежная" : s === "дерзкая" ? "Дерзкая" : s === "покорная" ? "Покорная" : "Доминантная"}
                 </motion.button>
               ))}
@@ -243,26 +224,26 @@ export default function NeonGlowAI() {
           </motion.div>
         )}
 
-        {/* === ЧАТ С ГОЛЫМИ ФОТО === */}
+        {/* ЧАТ С КРАСИВЫМИ ФОТО */}
         {step === "chat" && (
           <motion.div key="chat" className="flex flex-col h-screen">
-            <div className="flex-1 overflow-y-auto p-4 space-y-5 pb-36">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
               {messages.map((m, i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`max-w-[88%] px-6 py-4 rounded-3xl text-lg md:text-xl shadow-2xl ${
+                  className={`max-w-[85%] px-5 py-3 rounded-3xl text-lg md:text-xl shadow-2xl ${
                     m.role === "user"
-                      ? "ml-auto bg-gradient-to-l from-purple-700 to-pink-700 text-white"
-                      : "mr-auto bg-gradient-to-r from-pink-700 to-purple-700 text-white"
+                      ? "ml-auto bg-gradient-to-l from-purple-600 to-pink-600 text-white"
+                      : "mr-auto bg-gradient-to-r from-pink-600 to-purple-600 text-white"
                   }`}
                 >
                   {m.type === "image" ? (
                     <img
                       src={m.content}
-                      alt="18+ фото"
-                      className="rounded-2xl max-w-full h-auto border-4 border-white/30 shadow-xl"
+                      alt="Горячее фото"
+                      className="rounded-2xl max-w-full h-auto border-4 border-white/20 shadow-xl"
                       onLoad={() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })}
                     />
                   ) : (
@@ -273,26 +254,25 @@ export default function NeonGlowAI() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Нижняя панель */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/95 to-transparent">
-              <div className="flex gap-3 items-center mb-4">
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/90">
+              <div className="flex gap-3 items-center mb-3">
                 <textarea
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
                   placeholder="Напиши или нажми камеру..."
                   rows={1}
-                  className="flex-1 px-6 py-4 rounded-full bg-white/10 backdrop-blur border border-white/20 focus:border-pink-500 outline-none resize-none text-lg text-white placeholder-white/50"
+                  className="flex-1 px-6 py-4 rounded-full bg-white/10 backdrop-blur border border-white/20 focus:border-pink-500 outline-none resize-none text-lg"
                 />
-                <button onClick={() => setInput("сделай фото")} className="p-4 rounded-full bg-pink-600 shadow-lg">
+                <button onClick={() => setInput("сделай фото")} className="p-4 rounded-full bg-pink-600">
                   <Heart className="w-7 h-7" />
                 </button>
-                <button onClick={sendMessage} disabled={loading} className="p-4 rounded-full bg-purple-600 shadow-lg disabled:opacity-50">
+                <button onClick={sendMessage} disabled={loading} className="p-4 rounded-full bg-purple-600 disabled:opacity-50">
                   <MessageCircle className="w-7 h-7" />
                 </button>
-                <button onClick={generatePhoto} disabled={generatingPhoto} className="p-4 rounded-full bg-red-600 shadow-lg relative">
+                <button onClick={generatePhoto} disabled={generatingPhoto} className="p-4 rounded-full bg-red-600 relative">
                   <Camera className="w-7 h-7" />
-                  {generatingPhoto && <div className="absolute inset-0 border-4 border-t-transparent border-white rounded-full animate-spin"></div>}
+                  {generatingPhoto && <div className="absolute inset-0 rounded-full border-4 border-t-transparent border-white animate-spin"></div>}
                 </button>
               </div>
 
