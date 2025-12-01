@@ -7,13 +7,13 @@ export default function NeonGlowAI() {
   const [step, setStep] = useState("welcome");
 
   const [personality, setPersonality] = useState({
-    gender: null,           // "Женщина" | "Мужчина"
-    orientation: null,      // "натурал" | "би" | "гей"/"лесби"
-    style: null,            // "нежная" | "дерзкая" | "покорная" | "доминантная"
+    gender: null,
+    orientation: null,
+    style: null,
     nsfw: true,
   });
 
-  const [messages, setMessages] = useState([]); // {role: "user"|"assistant", content: string, type?: "image"}
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [generatingPhoto, setGeneratingPhoto] = useState(false);
@@ -21,7 +21,6 @@ export default function NeonGlowAI() {
   const messagesEndRef = useRef(null);
   const audioRef = useRef(null);
 
-  // Автопрокрутка
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -32,7 +31,8 @@ export default function NeonGlowAI() {
       window.Telegram.WebApp.expand();
     }
   }, []);
-    // TTS
+
+  // TTS
   const speak = useCallback(async (text) => {
     if (!text) return;
     try {
@@ -49,7 +49,7 @@ export default function NeonGlowAI() {
     } catch (e) {}
   }, [personality.nsfw]);
 
-  // Стриминг чата
+  // Чат
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
     const userMsg = input.trim();
@@ -105,14 +105,15 @@ export default function NeonGlowAI() {
     } catch (err) {
       setMessages(prev => {
         const arr = [...prev];
-        arr[arr.length - 1].content = "Ой, я запуталась… попробуй ещё раз ❤️";
+        arr[arr.length - 1].content = "Ой, я запуталась… попробуй ещё раз";
         return arr;
       });
     } finally {
       setLoading(false);
     }
   };
-    // Генерация фото (работает с fal.ai)
+
+  // Генерация фото
   const generatePhoto = async () => {
     if (generatingPhoto) return;
     setGeneratingPhoto(true);
@@ -128,7 +129,7 @@ export default function NeonGlowAI() {
 
       const { imageUrl } = await res.json();
 
-      setMessages(prev => 
+      setMessages(prev =>
         prev.filter(m => m.content !== "Генерирую горячее фото... (15–25 сек)")
             .concat({ role: "assistant", content: imageUrl, type: "image" })
       );
@@ -139,15 +140,10 @@ export default function NeonGlowAI() {
     }
   };
 
-  const undoLastMessage = () => {
-    setMessages(prev => prev.length >= 2 ? prev.slice(0, -2) : prev);
-  };
+  const undoLastMessage = () => setMessages(prev => prev.length >= 2 ? prev.slice(0, -2) : prev);
+  const resetChat = () => { setMessages([]); setStep("welcome"); };
 
-  const resetChat = () => {
-    setMessages([]);
-    setStep("welcome");
-  };
-    return (
+  return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-950 via-pink-900 to-black text-white overflow-hidden">
       <audio ref={audioRef} />
 
@@ -189,7 +185,7 @@ export default function NeonGlowAI() {
             <h2 className="text-4xl sm:text-5xl font-bold text-center">Ориентация</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-2xl">
               <motion.button whileHover={{ scale: 1.1 }} onClick={() => { setPersonality(p => ({...p, orientation: "натурал"})); setStep("style"); }}
-                className="px-8 py-5 rounded-full bg-pink-600 text-xl font-bold">Натурал</motion #}
+                className="px-8 py-5 rounded-full bg-pink-600 text-xl font-bold">Натурал</motion.button>
               <motion.button whileHover={{ scale: 1.1 }} onClick={() => { setPersonality(p => ({...p, orientation: "би"})); setStep("style"); }}
                 className="px-8 py-5 rounded-full bg-purple-600 text-xl font-bold">Би</motion.button>
               <motion.button whileHover={{ scale: 1.1 }} onClick={() => { setPersonality(p => ({...p, orientation: p.gender === "Мужчина" ? "гей" : "лесби"})); setStep("style"); }}
@@ -227,11 +223,11 @@ export default function NeonGlowAI() {
                   animate={{ opacity: 1, y: 0 }}
                   className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
                 >
-                  <div className={`max-w-[85%] rounded-3xl px-5 py-3 shadow-2xl ${
+                  <div className={`max-w-[85%] rounded-3xl px-5 py-3 shadow-2xl text-white ${
                     m.role === "user" 
                       ? "bg-gradient-to-l from-purple-700 to-pink-700" 
                       : "bg-gradient-to-r from-pink-700 to-purple-700"
-                  } text-white`}>
+                  }`}>
                     {m.type === "image" ? (
                       <img src={m.content} alt="18+" className="rounded-2xl max-w-full h-auto border-4 border-white/20 shadow-xl" />
                     ) : (
@@ -243,7 +239,6 @@ export default function NeonGlowAI() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Нижняя панель */}
             <div className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-white/10">
               <div className="p-4 flex items-end gap-3">
                 <textarea
@@ -252,7 +247,7 @@ export default function NeonGlowAI() {
                   onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
                   placeholder="Напиши или нажми камеру..."
                   rows={1}
-                  className="flex-1 bg-white/10 rounded-2xl px-5 py-3.5 text-base outline-none resize-none max-h-32 scrollbar-hide placeholder-white/50"
+                  className="flex-1 bg-white/10 rounded-2xl px-5 py-3.5 text-base outline-none resize-none max-h-32 placeholder-white/50"
                 />
                 <button onClick={() => setInput("сделай фото")} className="p-3.5 bg-pink-600 rounded-full shadow-lg">
                   <Heart className="w-6 h-6" />
