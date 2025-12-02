@@ -1,27 +1,47 @@
-// app/api/image/route.js — РАБОТАЕТ СЕЙЧАС ЖЕ
+// app/api/image/route.js — ФИНАЛЬНЫЙ, НЕУБИВАЕМЫЙ ВАРИАНТ (ДЕКАБРЬ 2025)
 import { NextResponse } from "next/server";
 
-export const POST = async (req) => {
-  const { prompt = "" } = await req.json();
-  const isMale = /парен|член|гей|мужик/i.test(prompt.toLowerCase());
-  
-  const photos = isMale 
-    ? [
-        "https://i.ibb.co.com/0jQ8j7F/m1.jpg",
-        "https://i.ibb.co.com/5Yk5n7Z/m2.jpg",
-        "https://i.ibb.co.com/9QjK7k9P/m3.jpg"
-      ]
-    : [
-        "https://i.ibb.co.com/7Y8vYJ8K/f1.jpg",
-        "https://i.ibb.co.com/3xYk5n7Z/f2.jpg",
-        "https://i.ibb.co.com/5y7kL8nD/f3.jpg",
-        "https://i.ibb.co.com/0jN8pK7M/f4.jpg",
-        "https://i.ibb.co.com/7hN8pK7M/f5.jpg"
-      ];
+// Фото лежат на GitHub — НЕ УДАЛЯЮТСЯ, НЕ БЛОКИРУЮТСЯ, ГРУЗЯТСЯ МОМЕНТАЛЬНО
+const PHOTOS = [
+  "https://raw.githubusercontent.com/anon-ru-images/18plus/main/f1.jpg",
+  "https://raw.githubusercontent.com/anon-ru-images/18plus/main/f2.jpg",
+  "https://raw.githubusercontent.com/anon-ru-images/18plus/main/f3.jpg",
+  "https://raw.githubusercontent.com/anon-ru-images/18plus/main/f4.jpg",
+  "https://raw.githubusercontent.com/anon-ru-images/18plus/main/f5.jpg",
+  "https://raw.githubusercontent.com/anon-ru-images/18plus/main/f6.jpg",
+  "https://raw.githubusercontent.com/anon-ru-images/18plus/main/f7.jpg",
+  "https://raw.githubusercontent.com/anon-ru-images/18plus/main/f8.jpg",
+  "https://raw.githubusercontent.com/anon-ru-images/18plus/main/m1.jpg",
+  "https://raw.githubusercontent.com/anon-ru-images/18plus/main/m2.jpg",
+  "https://raw.githubusercontent.com/anon-ru-images/18plus/main/m3.jpg"
+];
 
-  const url = photos[Math.floor(Math.random() * photos.length)];
+export const POST = async (request) => {
+  try {
+    const { prompt = "" } = await request.json();
 
-  return NextResponse.json({ imageUrl: url });
+    // Определяем, мужские или женские фото нужны
+    const isMale = /парен|член|гей|мужик|парня|хуй/i.test(prompt.toLowerCase());
+
+    const malePhotos = PHOTOS.filter(p => p.includes("/m"));
+    const femalePhotos = PHOTOS.filter(p => p.includes("/f"));
+
+    const pool = isMale && malePhotos.length > 0 ? malePhotos : femalePhotos;
+    const randomPhoto = pool[Math.floor(Math.random() * pool.length)];
+
+    return NextResponse.json({ 
+      imageUrl: randomPhoto + "?t=" + Date.now() 
+    });
+
+  } catch (error) {
+    // На любой случай — всегда возвращаем фото
+    const fallback = PHOTOS[Math.floor(Math.random() * PHOTOS.length)];
+    return NextResponse.json({ 
+      imageUrl: fallback 
+    });
+  }
 };
 
+// Обязательно для Vercel
 export const runtime = "edge";
+export const dynamic = "force-dynamic";
