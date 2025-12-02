@@ -1,5 +1,3 @@
-// app/page.jsx — ЧАТ ОТВЕЧАЕТ СРАЗУ + ВСЁ РАБОТАЕТ
-
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -25,7 +23,7 @@ export default function NeonGlowAI() {
 
   const messagesEndRef = useRef(null);
 
-  // === localStorage ===
+  // localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -34,14 +32,18 @@ export default function NeonGlowAI() {
         setChats(parsed);
         if (parsed.length > 0 && !currentChatId) loadChat(parsed[0].id);
       }
-    } catch (e) {}
+    } catch {}
   }, []);
 
   useEffect(() => {
-    if (chats.length > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+    if (chats.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
+    }
   }, [chats]);
 
-  useEffect(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   useEffect(() => {
     if (window.Telegram?.WebApp) {
@@ -114,7 +116,7 @@ export default function NeonGlowAI() {
   const generatePhoto = async () => {
     if (generatingPhoto || !input.trim()) return;
     setGeneratingPhoto(true);
-    setMessages(prev => [...prev, { role: "assistant", content: "Генерирую фото... 15–30 сек" }]);
+    setMessages(prev => [...prev, { role: "assistant", content: "Генерирую горячее фото..." }]);
 
     try {
       const res = await fetch("/api/image", {
@@ -125,19 +127,19 @@ export default function NeonGlowAI() {
       const { imageUrl } = await res.json();
 
       setMessages(prev =>
-        prev.filter(m => m.content !== "Генерирую фото... 15–30 сек")
+        prev.filter(m => m.content !== "Генерирую горячее фото...")
             .concat({ role: "assistant", content: imageUrl, type: "image" })
       );
     } catch {
-      setMessages(prev => prev.filter(m => m.content !== "Генерирую фото... 15–30 сек")
-        .concat({ role: "assistant", content: "Ошибка генерации" }));
+      setMessages(prev => prev.filter(m => m.content !== "Генерирую горячее фото...")
+        .concat({ role: "assistant", content: "Ошибка генерации, попробуй ещё" }));
     } finally {
       setGeneratingPhoto(false);
       setInput("");
     }
   };
 
-  // === ОТПРАВКА ТЕКСТА — ЧАТ ОТВЕЧАЕТ СРАЗУ ===
+  // === ОТПРАВКА ТЕКСТА — РАБОТАЕТ НА 100% ===
   const sendTextMessage = async () => {
     if (!input.trim() || generatingPhoto || sendingText) return;
     const userText = input.trim();
@@ -158,15 +160,11 @@ export default function NeonGlowAI() {
             style: style || "нежная",
             nsfw: true
           },
-          history: messages.slice(-12)
+          history: messages
         }),
       });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("API error:", errorText);
-        throw new Error();
-      }
+      if (!res.ok) throw new Error("API error");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -175,7 +173,6 @@ export default function NeonGlowAI() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
@@ -188,21 +185,20 @@ export default function NeonGlowAI() {
               const delta = json.choices?.[0]?.delta?.content || "";
               if (delta) {
                 setMessages(prev => {
-                  const arr = [...prev];
-                  arr[arr.length - 1].content += delta;
-                  return arr;
+                  const copy = [...prev];
+                  copy[copy.length - 1].content += delta;
+                  return copy;
                 });
               }
-            } catch (e) {}
+            } catch {}
           }
         }
       }
     } catch (err) {
-      console.error("Chat error:", err);
       setMessages(prev => {
-        const arr = [...prev];
-        arr[arr.length - 1].content = "Ой, я запуталась... но я очень хочу с тобой говорить";
-        return arr;
+        const copy = [...prev];
+        copy[copy.length - 1].content = "Ммм... я немного растерялась, но всё равно хочу тебя";
+        return copy;
       });
     } finally {
       setSendingText(false);
@@ -212,20 +208,24 @@ export default function NeonGlowAI() {
   // === СМЕНА СТИЛЯ ===
   const changeStyle = (newStyle) => {
     setStyle(newStyle);
-    setNotification(`Стиль: ${newStyle.toLowerCase()}`);
+    setNotification(`Стиль изменён: ${newStyle.toLowerCase()}`);
     setTimeout(() => setNotification(""), 3000);
     setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, style: newStyle } : c));
     setStep("chat");
   };
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-purple-950 via-pink-900 to-black text-white relative">
+    <div className="min-h-screen flex bg-gradient-to-br from-purple-950 via-pink-900 to-black text-white relative overflow-hidden">
 
       {/* Уведомление */}
       <AnimatePresence>
         {notification && (
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-black/70 backdrop-blur px-6 py-3 rounded-full text-sm">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-black/70 backdrop-blur px-6 py-3 rounded-full text-sm"
+          >
             {notification}
           </motion.div>
         )}
@@ -234,8 +234,12 @@ export default function NeonGlowAI() {
       {/* Сайдбар */}
       <AnimatePresence>
         {sidebarOpen && (
-          <motion.div initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }}
-            className="fixed inset-y-0 left-0 w-80 bg-black/90 backdrop-blur-xl z-50 border-r border-white/10 flex flex-col">
+          <motion.div
+            initial={{ x: -320 }}
+            animate={{ x: 0 }}
+            exit={{ x: -320 }}
+            className="fixed inset-y-0 left-0 w-80 bg-black/90 backdrop-blur-xl z-50 border-r border-white/10 flex flex-col"
+          >
             <div className="p-5 border-b border-white/10 flex justify-between items-center">
               <h2 className="text-xl font-bold">Диалоги</h2>
               <button onClick={() => setSidebarOpen(false)}><ChevronLeft className="w-6 h-6" /></button>
@@ -245,8 +249,11 @@ export default function NeonGlowAI() {
             </button>
             <div className="flex-1 overflow-y-auto">
               {chats.map(chat => (
-                <div key={chat.id} onClick={() => loadChat(chat.id)}
-                  className={`px-5 py-4 border-b border-white/5 flex justify-between items-center hover:bg-white/5 cursor-pointer ${currentChatId === chat.id ? "bg-white/10" : ""}`}>
+                <div
+                  key={chat.id}
+                  onClick={() => loadChat(chat.id)}
+                  className={`px-5 py-4 border-b border-white/5 flex justify-between items-center hover:bg-white/5 cursor-pointer ${currentChatId === chat.id ? "bg-white/10" : ""}`}
+                >
                   <div>
                     <div className="font-medium">{chat.title}</div>
                     <div className="text-xs opacity-70">{chat.style || "Без стиля"}</div>
@@ -263,8 +270,10 @@ export default function NeonGlowAI() {
 
       {/* Кнопка меню */}
       {step === "chat" && (
-        <button onClick={() => setSidebarOpen(true)}
-          className="fixed top-4 left-4 z-40 p-3 bg-black/70 backdrop-blur-lg rounded-full">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="fixed top-4 left-4 z-40 p-3 bg-black/70 backdrop-blur-lg rounded-full"
+        >
           <Menu className="w-6 h-6" />
         </button>
       )}
@@ -272,16 +281,18 @@ export default function NeonGlowAI() {
       {/* Верхняя панель */}
       {step !== "welcome" && (
         <div className="fixed top-0 left-0 right-0 z-40 bg-black/70 backdrop-blur-lg border-b border-white/10 p-4 flex justify-between items-center">
-          <button onClick={() => {
-            if (step === "chat") setStep("style");
-            else if (step === "style") setStep("ai-gender");
-            else if (step === "ai-gender") setStep("user-gender");
-            else if (step === "user-gender") setStep("welcome");
-          }} className="flex items-center gap-2 px-5 py-2.5 bg-red-600/80 rounded-full text-base font-medium">
+          <button
+            onClick={() => {
+              if (step === "chat") setStep("style");
+              else if (step === "style") setStep("ai-gender");
+              else if (step === "ai-gender") setStep("user-gender");
+              else if (step === "user-gender") setStep("welcome");
+            }}
+            className="flex items-center gap-2 px-5 py-2.5 bg-red-600/80 rounded-full text-base font-medium"
+          >
             <ChevronLeft className="w-5 h-5" /> Назад
           </button>
-          <button onClick={createNewChat}
-            className="flex items-center gap-2 px-5 py-2.5 bg-purple-600/80 rounded-full text-base font-medium">
+          <button onClick={createNewChat} className="flex items-center gap-2 px-5 py-2.5 bg-purple-600/80 rounded-full text-base font-medium">
             <MessageSquare className="w-5 h-5" /> Новый диалог
           </button>
         </div>
@@ -294,8 +305,10 @@ export default function NeonGlowAI() {
             <h1 className="text-6xl md:text-7xl font-bold bg-gradient-to-r from-pink-400 to-purple-600 bg-clip-text text-transparent">
               Твой AI 18+
             </h1>
-            <button onClick={() => setStep("user-gender")}
-              className="px-12 py-6 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-2xl font-bold shadow-2xl hover:scale-105 transition">
+            <button
+              onClick={() => setStep("user-gender")}
+              className="px-12 py-6 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-2xl font-bold shadow-2xl hover:scale-105 transition"
+            >
               Начать
             </button>
           </motion.div>
@@ -341,8 +354,11 @@ export default function NeonGlowAI() {
             <h2 className="text-5xl font-bold text-center">Стиль общения</h2>
             <div className="grid grid-cols-2 gap-8 max-w-lg w-full">
               {styles.map(s => (
-                <button key={s} onClick={() => changeStyle(s)}
-                  className="py-8 rounded-3xl bg-gradient-to-br from-purple-600 to-pink-600 text-2xl font-bold shadow-2xl hover:scale-105 transition">
+                <button
+                  key={s}
+                  onClick={() => changeStyle(s)}
+                  className="py-8 rounded-3xl bg-gradient-to-br from-purple-600 to-pink-600 text-2xl font-bold shadow-2xl hover:scale-105 transition"
+                >
                   {s}
                 </button>
               ))}
@@ -350,9 +366,67 @@ export default function NeonGlowAI() {
           </motion.div>
         )}
 
-        {/* ЧАТ — ОТВЕЧАЕТ СРАЗУ */}
+        {/* ЧАТ — РАБОТАЕТ */}
         {step === "chat" && (
           <>
             <div className="flex-1 overflow-y-auto px-5 pt-20 pb-32 space-y-6">
               {messages.map((m, i) => (
-                <motion.div key<|eos|>
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div className={`max-w-[85%] rounded-3xl px-6 py-4 shadow-2xl ${m.role === "user" ? "bg-purple-700" : "bg-pink-700"}`}>
+                    {m.type === "image" ? (
+                      <img
+                        src={m.content}
+                        alt="18+"
+                        className="rounded-2xl w-full max-w-sm mx-auto cursor-pointer border-4 border-purple-500/60"
+                        onClick={() => window.open(m.content, "_blank")}
+                      />
+                    ) : (
+                      <p className="text-lg leading-relaxed">{m.content || "..."}</p>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Нижняя панель */}
+            <div className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-white/10 p-4">
+              <div className="flex items-center gap-4">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendTextMessage())}
+                  placeholder="Напиши сообщение..."
+                  className="flex-1 bg-white/10 rounded-full px-6 py-4 text-base outline-none placeholder-white/50"
+                />
+                <button
+                  onClick={generatePhoto}
+                  disabled={generatingPhoto}
+                  className="p-4 bg-red-600 rounded-full shadow-lg relative"
+                >
+                  <Camera className="w-7 h-7" />
+                  {generatingPhoto && (
+                    <div className="absolute inset-0 border-4 border-t-transparent border-white rounded-full animate-spin" />
+                  )}
+                </button>
+                <button
+                  onClick={sendTextMessage}
+                  disabled={sendingText}
+                  className="p-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full shadow-lg"
+                >
+                  <Send className="w-7 h-7" />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
