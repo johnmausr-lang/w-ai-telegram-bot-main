@@ -1,10 +1,10 @@
 "use client";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Download } from "lucide-react";
-import { loadSavedImages } from "@/lib/storage";
 
 export default function GalleryGrid({ isOpen, onClose }) {
-  const images = loadSavedImages(); // отдельная функция в storage.js
+  // Пока просто заглушка, потом подключим реальное хранилище
+  const images = JSON.parse(localStorage.getItem("generated_images") || "[]").reverse();
 
   return (
     <AnimatePresence>
@@ -39,16 +39,18 @@ export default function GalleryGrid({ isOpen, onClose }) {
                 images.map((src, i) => (
                   <motion.div
                     key={i}
-                    layoutId={`gallery-${i}`}
+                    layoutId={`img-${src}`}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     className="relative group rounded-2xl overflow-hidden"
                   >
-                    <img src={src} className="w-full h-full object-cover" />
+                    <img src={src} alt="" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <button className="p-4 bg-white/20 backdrop-blur rounded-2xl">
-                        <Download className="w-6 h-6" />
-                      </button>
+                      <a href={src} download>
+                        <button className="p-4 bg-white/20 backdrop-blur rounded-2xl">
+                          <Download className="w-6 h-6" />
+                        </button>
+                      </a>
                     </div>
                   </motion.div>
                 ))
