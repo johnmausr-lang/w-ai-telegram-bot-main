@@ -1,5 +1,5 @@
 import "./globals.css";
-
+export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Chromatic Eclipse",
   description: "Премиальный 18+ ИИ-компаньон • 2025",
