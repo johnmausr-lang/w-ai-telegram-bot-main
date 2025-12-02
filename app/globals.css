@@ -2,132 +2,52 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-  .slider::-webkit-slider-thumb {
-    @apply appearance-none w-8 h-8 bg-white rounded-full shadow-lg cursor-pointer;
-  }
-}
-
 body {
-  @apply bg-deep-onyx text-soft-white antialiased;
+  @apply bg-eclipse-bg text-text-primary antialiased;
 }
 
-/* Анимированный неон-градиент фона с дымчатым эффектом */
-@keyframes neonGradient {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
+/* Liquid transition */
+@keyframes liquid {
+  0%, 100% { border-radius: 33% 67% 67% 33% / 44% 56% 44% 56%; }
+  50% { border-radius: 50% 50% 50% 50% / 60% 40% 60% 40%; }
 }
 
-.neon-bg {
-  background: linear-gradient(135deg, #0B0C12, #12131B, #0B0C12);
-  background-size: 200% 200%;
-  animation: neonGradient 15s ease infinite;
-  filter: blur(1px); /* Лёгкий дымчатый эффект */
+/* Neon pulse */
+@keyframes neonPulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(255, 47, 174, 0.6); }
+  50% { box-shadow: 0 0 30px rgba(255, 47, 174, 1); }
 }
 
-/* Пульсация бликов для кнопок */
-@keyframes pulseGlow {
-  0% {
-    box-shadow: 0 0 5px rgba(255, 46, 99, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(255, 46, 99, 0.8);
-  }
-  100% {
-    box-shadow: 0 0 5px rgba(255, 46, 99, 0.3);
-  }
-}
+.neon-pulse { animation: neonPulse 2s ease-in-out infinite; }
+.liquid { animation: liquid 8s ease-in-out infinite; }
 
-.pulse-glow {
-  animation: pulseGlow 2s ease-in-out infinite;
-}
-
-/* Hover-spotlight эффект (свет от курсора) с неоновым акцентом */
-.spotlight-hover {
-  position: relative;
-  overflow: hidden;
-}
-
-.spotlight-hover::before {
-  content: "";
-  position: absolute;
-  top: -100%;
-  left: -100%;
-  width: 300%;
-  height: 300%;
-  background: radial-gradient(circle, rgba(255, 46, 99, 0.3) 0%, rgba(0, 212, 161, 0) 70%);
-  pointer-events: none;
-  transition: top 0.3s ease, left 0.3s ease;
-}
-
-.spotlight-hover:hover::before {
-  top: 0;
-  left: 0;
-}
-
-/* Анимация печати текста AI с свечением */
-@keyframes typeGlow {
-  0% {
-    opacity: 0;
-    text-shadow: 0 0 5px rgba(255, 46, 99, 0.5);
-  }
-  100% {
-    opacity: 1;
-    text-shadow: 0 0 20px rgba(255, 46, 99, 1);
-  }
-}
-
-.ai-text {
-  animation: typeGlow 0.5s ease-in-out;
-}
-
-/* Glassmorphism для панелей */
-.glass-panel {
-  background: rgba(18, 19, 27, 0.8); /* #12131B с opacity */
+/* Glass panel */
+.glass {
+  background: rgba(17, 17, 26, 0.6);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255,255,255,0.06);
 }
 
-/* Неоновая обводка */
-.neon-border {
-  border: 2px solid transparent;
-  border-image: linear-gradient(135deg, #FF2E63, #C81D4E) 1;
+/* Blur preview */
+.blur-preview {
+  filter: blur(12px);
+  transition: filter 0.4s ease;
+}
+.blur-preview.revealed {
+  filter: none;
 }
 
-/* Лёгкие движущиеся частицы для фона чата */
-@keyframes particles {
-  0% { transform: translateY(0); opacity: 0.5; }
-  100% { transform: translateY(-100vh); opacity: 0; }
+/* Neon border */
+.neon-border-pink {
+  border: 1px solid transparent;
+  background: linear-gradient(#11111A, #11111A) padding-box,
+              linear-gradient(135deg, #FF2FAE, #9011FF) border-box;
 }
 
-.particles-bg::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><circle cx="0.5" cy="0.5" r="0.5" fill="rgba(255,255,255,0.05)"/></svg>') repeat;
-  background-size: 10px 10px;
-  animation: particles 60s linear infinite;
-  pointer-events: none;
+/* Overshoot bounce */
+@keyframes bounceIn {
+  0% { opacity: 0; transform: translateY(30px) scale(0.9); }
+  60% { opacity: 1; transform: translateY(-10px) scale(1.05); }
+  100% { transform: translateY(0) scale(1); }
 }
-
-/* Breathing glow для аватаров */
-@keyframes breathingGlow {
-  0% { box-shadow: 0 0 5px rgba(0, 212, 161, 0.5); }
-  50% { box-shadow: 0 0 15px rgba(0, 212, 161, 1); }
-  100% { box-shadow: 0 0 5px rgba(0, 212, 161, 0.5); }
-}
-
-.breathing-glow {
-  animation: breathingGlow 3s ease-in-out infinite;
-}
+.bounce-in { animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
