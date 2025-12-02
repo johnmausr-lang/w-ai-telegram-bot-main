@@ -1,7 +1,9 @@
 "use client";
 import { motion } from "framer-motion";
-import { Send, Camera, Mic } from "lucide-react";
-import { haptic } from "@/lib/haptic";
+import { Send, Sparkles } from "lucide-react";
+
+// Временно убираем haptic — работает без него
+// import { haptic } from "../lib/haptic";
 
 export default function InputBar({ input, setInput, onSend, onImageGen, isImagePrompt }) {
   return (
@@ -22,16 +24,16 @@ export default function InputBar({ input, setInput, onSend, onImageGen, isImageP
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               whileTap={{ scale: 0.9 }}
-              onClick={() => { onImageGen(); haptic("medium"); }}
+              onClick={onImageGen}
               className="p-4 bg-gradient-to-br from-[#FF47A3] to-[#CC338F] rounded-2xl glow-pink"
             >
-              <Camera className="w-6 h-6" />
+              <Sparkles className="w-6 h-6" />
             </motion.button>
           )}
 
           <motion.button
             whileTap={{ scale: 0.9 }}
-            onClick={() => { onSend(); haptic(); }}
+            onClick={onSend}
             className="p-4 bg-[#00CCFF] rounded-2xl glow-cyan"
           >
             <Send className="w-6 h-6" />
