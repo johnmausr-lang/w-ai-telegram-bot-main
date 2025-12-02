@@ -18,10 +18,10 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ru">
       <head>
-        <meta name="theme-color" content="#000000" />
+        <meta name="theme-color" content="#0B0C12" />
         <link rel="manifest" href="/manifest.json" />
       </head>
-      <body className="min-h-screen w-screen overflow-hidden bg-black text-white antialiased flex flex-col">
+      <body className="min-h-screen w-screen overflow-hidden bg-deep-onyx text-soft-white antialiased flex flex-col">
         {children}
       </body>
     </html>
