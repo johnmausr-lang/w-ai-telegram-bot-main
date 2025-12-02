@@ -1,15 +1,36 @@
 @tailwind base; @tailwind components; @tailwind utilities;
 
-body { @apply bg-eclipse-bg text-text-primary antialiased; }
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-@keyframes liquid { 0%,100% { border-radius: 33% 67% 67% 33%/44% 56% 44% 56%; } 50% { border-radius: 50% 50% 50% 50%/60% 40% 60% 40%; } }
-@keyframes neonPulse { 0%,100% { box-shadow: 0 0 15px rgba(255,47,174,.6); } 50% { box-shadow: 0 0 35px rgba(255,47,174,1); } }
-@keyframes bounceIn { 0% { opacity:0; transform:translateY(30px) scale(.9); } 60% { opacity:1; transform:translateY(-10px) scale(1.05); } 100% { transform:translateY(0) scale(1); } }
+body {
+  @apply bg-[var(--bg-primary)] text-[var(--text-primary)] font-['Inter'];
+  background: radial-gradient(circle at var(--mouse-x,50%) var(--mouse-y,50%), rgba(255,71,163,0.08) 0%, transparent 50%), #0A0A0E;
+}
 
-.neon-pulse { animation: neonPulse 2s ease-in-out infinite; }
-.liquid { animation: liquid 8s ease-in-out infinite; }
-.glass { background: rgba(17,17,26,.6); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,.06); }
-.neon-border-pink { border: 1px solid transparent; background: linear-gradient(#11111A,#11111A) padding-box, linear-gradient(135deg,#FF2FAE,#9011FF) border-box; }
-.blur-preview { filter: blur(12px); transition: filter .4s; }
-.blur-preview.revealed { filter: none; }
-.bounce-in { animation: bounceIn .6s cubic-bezier(.68,-.55,.265,1.55); }
+/* Glassmorphism */
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glass);
+}
+
+/* Неоновое свечение */
+.glow-pink {
+  box-shadow: 0 0 20px rgba(255,71,163,0.6);
+}
+.glow-cyan { box-shadow: 0 0 20px rgba(0,204,255,0.6); }
+
+/* Liquid анимация */
+@keyframes liquid { 
+  0%,100% { border-radius: 33% 67% 70% 30% / 40% 60% 40% 60%; } 
+  50% { border-radius: 50% 50% 50% 50% / 60% 40% 60% 40%; } 
+}
+.liquid { animation: liquid 12s ease-in-out infinite; }
+
+/* Holographic reveal */
+@keyframes holoReveal {
+  0% { clip-path: inset(100% 0 0 0); filter: brightness(3) contrast(3); }
+  50% { clip-path: inset(0% 0 0 0); }
+}
+.holo { animation: holoReveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
