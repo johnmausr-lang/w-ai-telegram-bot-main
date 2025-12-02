@@ -1,60 +1,26 @@
-// app/page.jsx — ПОЛНАЯ ВЕРСИЯ С МАКСИМУМ ЛОГОВ (ЧАТ + ФОТО РАБОТАЮТ)
-
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, Send, ChevronLeft, MessageSquare, Trash2, Menu } from "lucide-react";
-
-const STORAGE_KEY = "neon_ai_chats_2025";
+import { Heart, MessageCircle, Camera, ChevronLeft } from "lucide-react";
 
 export default function NeonGlowAI() {
   const [step, setStep] = useState("welcome");
-  const [userGender, setUserGender] = useState(null);
-  const [aiGender, setAiGender] = useState(null);
-  const [style, setStyle] = useState(null);
+  const [personality, setPersonality] = useState({
+    gender: null,
+    orientation: null,
+    style: null,
+    nsfw: true,
+  });
 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
   const [generatingPhoto, setGeneratingPhoto] = useState(false);
-  const [sendingText, setSendingText] = useState(false);
-  const [notification, setNotification] = useState("");
-
-  const [chats, setChats] = useState([]);
-  const [currentChatId, setCurrentChatId] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const audioRef = useRef(null);
 
-  // === ЛОГИРОВАНИЕ ВСЁГО ===
-  const log = (title, data = "") => {
-    console.log(`%c[NEON AI] ${title}`, "color: #ff00ff; font-weight: bold;", data || "");
-  };
-
-  useEffect(() => {
-    log("Инициализация приложения");
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        log("Загружено диалогов из localStorage", parsed.length);
-        setChats(parsed);
-        if (parsed.length > 0 && !currentChatId) {
-          log("Автозагрузка последнего диалога");
-          loadChat(parsed[0].id);
-        }
-      }
-    } catch (e) {
-      log("Ошибка localStorage", e);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (chats.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
-      log("Диалоги сохранены в localStorage", chats.length);
-    }
-  }, [chats]);
-
+  // Автопрокрутка с плавной анимацией
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -63,179 +29,54 @@ export default function NeonGlowAI() {
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
-      log("Telegram WebApp инициализирован");
     }
   }, []);
 
-  const isGay = userGender === "Мужчина" && aiGender === "Мужчина";
-  const styles = isGay
-    ? ["Нежный", "Дерзкий", "Покорный", "Доминантный"]
-    : ["Нежная", "Дерзкая", "Покорная", "Доминантная"];
-
-  // === ДИАЛОГИ ===
-  const createNewChat = () => {
-    log("Создание нового диалога");
-    const newChat = {
-      id: Date.now().toString(),
-      title: "Новый диалог",
-      messages: [],
-      createdAt: new Date().toISOString(),
-      userGender: userGender || "",
-      aiGender: aiGender || "",
-      style: style || ""
-    };
-    setChats(prev => [newChat, ...prev]);
-    setCurrentChatId(newChat.id);
-    setMessages([]);
-    setStep("chat");
-    setSidebarOpen(false);
-    log("Новый диалог создан", newChat.id);
-  };
-
-  const loadChat = (id) => {
-    log("Загрузка диалога", id);
-    const chat = chats.find(c => c.id === id);
-    if (chat) {
-      setCurrentChatId(id);
-      setMessages(chat.messages);
-      setUserGender(chat.userGender);
-      setAiGender(chat.aiGender);
-      setStyle(chat.style);
-      setStep("chat");
-      setSidebarOpen(false);
-      log("Диалог загружен", { messages: chat.messages.length, style: chat.style });
-    }
-  };
-
-  const deleteChat = (id, e) => {
-    e.stopPropagation();
-    log("Удаление диалога", id);
-    setChats(prev => prev.filter(c => c.id !== id));
-    if (currentChatId === id) {
-      setCurrentChatId(null);
-      setMessages([]);
-      setStep("welcome");
-    }
-  };
-
-  const deleteMessage = (index) => {
-    log("Удаление сообщения", index);
-    setMessages(prev => prev.filter((_, i) => i !== index));
-    setChats(prev => prev.map(c =>
-      c.id === currentChatId ? { ...c, messages: c.messages.filter((_, i) => i !== index) } : c
-    ));
-  };
-
-  useEffect(() => {
-    if (currentChatId && messages.length > 0) {
-      const title = messages[0]?.content?.slice(0, 35) || "Новый диалог";
-      setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, title } : c));
-    }
-  }, [messages, currentChatId]);
-
-  // === ГЕНЕРАЦИЯ ФОТО (С ЛОГАМИ) ===
-  const generatePhoto = async () => {
-    if (generatingPhoto || !input.trim()) {
-      log("Генерация фото: запрещено", { generating: generatingPhoto, empty: !input.trim() });
-      return;
-    }
-
-    log("НАЧАЛО ГЕНЕРАЦИИ ФОТО", input.trim());
-    setGeneratingPhoto(true);
-    setMessages(prev => [...prev, { role: "assistant", content: "Генерирую горячее фото... 15–30 сек" }]);
-
+  // === TTS (голос) ===
+  const speak = useCallback(async (text) => {
+    if (!text || !text.trim()) return;
     try {
-      log("Отправка запроса в /api/image");
-      const res = await fetch("/api/image", {
+      const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: input.trim() }),
+        body: JSON.stringify({ text, voice: "shimmer" }),
       });
-
-      log("Ответ от /api/image", { status: res.status, ok: res.ok });
-
-      if (!res.ok) {
-        const text = await res.text();
-        log("ОШИБКА API IMAGE", text);
-        throw new Error("API error");
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      if (audioRef.current) {
+        audioRef.current.src = url;
+        audioRef.current.play().catch(() => {});
       }
+    } catch (e) {}
+  }, []);
 
-      const data = await res.json();
-      log("Фото успешно сгенерировано!", data);
-
-      setMessages(prev =>
-        prev.filter(m => m.content !== "Генерирую горячее фото... 15–30 сек")
-            .concat({ role: "assistant", content: data.imageUrl, type: "image" })
-      );
-    } catch (err) {
-      log("КРИТИЧЕСКАЯ ОШИБКА ГЕНЕРАЦИИ", err);
-      setMessages(prev =>
-        prev.filter(m => m.content !== "Генерирую горячее фото... 15–30 сек")
-            .concat({ role: "assistant", content: "Не получилось сгенерировать фото... но я всё равно хочу тебя" })
-      );
-    } finally {
-      setGeneratingPhoto(false);
-      setInput("");
-      log("Генерация фото завершена");
-    }
-  };
-
-  // === ЧАТ (С МАКСИМУМ ЛОГОВ) ===
-  const sendTextMessage = async () => {
-    if (!input.trim() || generatingPhoto || sendingText) {
-      log("Отправка текста: запрещено", { empty: !input.trim(), generatingPhoto, sendingText });
-      return;
-    }
-
-    const userText = input.trim();
-    log("ПОЛЬЗОВАТЕЛЬ ОТПРАВИЛ СООБЩЕНИЕ", userText);
+  // === Чат со стримингом ===
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = input.trim();
     setInput("");
-    setSendingText(true);
+    setLoading(true);
 
-    setMessages(prev => [...prev, { role: "user", content: userText }]);
+    setMessages(prev => [...prev, { role: "user", content: userMsg }]);
     setMessages(prev => [...prev, { role: "assistant", content: "" }]);
 
     try {
-      log("Отправка в /api/chat", {
-        message: userText,
-        gender: aiGender || "Девушка",
-        style: style || "нежная"
-      });
-
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: userText,
-          personality: {
-            gender: aiGender || "Девушка",
-            style: style || "нежная",
-            nsfw: true
-          },
-          history: messages.slice(-20)
-        }),
+        body: JSON.stringify({ message: userMsg, personality, history: messages }),
       });
 
-      log("Ответ от /api/chat", { status: res.status, ok: res.ok });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        log("ОШИБКА API CHAT", errorText);
-        throw new Error("Chat API error");
-      }
+      if (!res.ok) throw new Error();
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
 
-      log("НАЧАЛО СТРИМИНГА ОТВЕТА");
-
       while (true) {
         const { done, value } = await reader.read();
-        if (done) {
-          log("СТРИМИНГ ЗАВЕРШЁН");
-          break;
-        }
+        if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
@@ -243,93 +84,235 @@ export default function NeonGlowAI() {
 
         for (let line of lines) {
           line = line.trim();
-          if (line.startsWith("data: ") && !line.includes("[DONE]")) {
-            try {
-              const json = JSON.parse(line.slice(6));
-              const delta = json.choices?.[0]?.delta?.content || "";
-              if (delta) {
-                setMessages(prev => {
-                  const copy = [...prev];
-                  copy[copy.length - 1].content += delta;
-                  return copy;
-                });
-              }
-            } catch (e) {
-              log("Ошибка парсинга SSE", line);
+          if (!line || line === "data: [DONE]") continue;
+          if (!line.startsWith("data: ")) continue;
+
+          try {
+            const data = JSON.parse(line.slice(6));
+            const delta = data.choices?.[0]?.delta?.content || "";
+            if (delta) {
+              setMessages(prev => {
+                const arr = [...prev];
+                arr[arr.length - 1].content += delta;
+                return arr;
+              });
             }
-          }
+          } catch (e) {}
         }
       }
+
+      // Озвучиваем ответ
+      const reply = messages[messages.length - 1]?.content || "";
+      if (reply) speak(reply);
+
     } catch (err) {
-      log("КРИТИЧЕСКАЯ ОШИБКА ЧАТА", err);
       setMessages(prev => {
-        const copy = [...prev];
-        copy[copy.length - 1].content = "Ммм... я так хочу тебя, но что-то пошло не так... напиши ещё разок";
-        return copy;
+        const arr = [...prev];
+        arr[arr.length - 1].content = "Ой, что-то пошло не так… попробуй ещё раз";
+        return arr;
       });
     } finally {
-      setSendingText(false);
-      log("ОТПРАВКА СООБЩЕНИЯ ЗАВЕРШЕНА");
+      setLoading(false);
     }
   };
 
-  // === СМЕНА СТИЛЯ ===
-  const changeStyle = (newStyle) => {
-    log("Смена стиля", newStyle);
-    setStyle(newStyle);
-    setNotification(`Стиль: ${newStyle.toLowerCase()}`);
-    setTimeout(() => setNotification(""), 3000);
-    setChats(prev => prev.map(c => c.id === currentChatId ? { ...c, style: newStyle } : c));
-    setStep("chat");
+  // === Генерация фото ===
+  const generatePhoto = async () => {
+    if (generatingPhoto) return;
+    setGeneratingPhoto(true);
+
+    setMessages(prev => [...prev, { role: "assistant", type: "image", content: "" }]);
+
+    try {
+      const prompt = messages.slice(-1)[0]?.content || ""; // Последнее сообщение как промпт
+      const res = await fetch("/api/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+
+      const { imageUrl } = await res.json();
+      if (imageUrl) {
+        setMessages(prev => {
+          const arr = [...prev];
+          arr[arr.length - 1].content = imageUrl;
+          return arr;
+        });
+      }
+    } catch (e) {}
+    setGeneratingPhoto(false);
+  };
+
+  const undoLastMessage = () => {
+    setMessages(prev => prev.slice(0, -2));
+  };
+
+  const resetChat = () => {
+    setMessages([]);
+    setStep("welcome");
   };
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-purple-950 via-pink-900 to-black text-white relative overflow-hidden">
-
-      {/* Уведомление */}
-      <AnimatePresence>
-        {notification && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-black/70 backdrop-blur px-6 py-3 rounded-full text-sm"
-          >
-            {notification}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Сайдбар, верхняя панель, экраны — как в прошлой версии */}
-      {/* (всё осталось без изменений, только логи добавлены выше) */}
+    <div className="relative min-h-screen w-screen overflow-hidden neon-bg particles-bg">
+      <audio ref={audioRef} className="hidden" />
 
       <AnimatePresence mode="wait">
+        {/* === ЭКРАН ПРИВЕТСТВИЯ === */}
         {step === "welcome" && (
-          <motion.div key="welcome" className="flex-1 flex flex-col items-center justify-center gap-12 px-6 text-center">
-            <h1 className="text-6xl md:text-7xl font-bold bg-gradient-to-r from-pink-400 to-purple-600 bg-clip-text text-transparent">
-              Твой AI 18+
-            </h1>
-            <button onClick={() => { log("Клик по НАЧАТЬ"); setStep("user-gender"); }}
-              className="px-12 py-6 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-2xl font-bold shadow-2xl hover:scale-105 transition">
+          <motion.div
+            key="welcome"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="flex flex-col items-center justify-center h-screen px-6 text-center glass-panel rounded-3xl mx-4"
+          >
+            <motion.h1
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-4xl font-bold mb-8 breathing-glow"
+            >
+              Neon Glow AI
+            </motion.h1>
+            <motion.p
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="text-lg mb-12 secondary-text"
+            >
+              Создай своего идеального спутника 18+
+            </motion.p>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setStep("gender")}
+              className="px-8 py-4 bg-accent-gradient-1 rounded-full text-lg font-semibold pulse-glow neon-border"
+            >
               Начать
-            </button>
+            </motion.button>
           </motion.div>
         )}
 
-        {/* USER GENDER, AI GENDER, STYLE — без изменений */}
+        {/* === ВЫБОР ПОЛА === */}
+        {step === "gender" && (
+          <motion.div
+            key="gender"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", stiffness: 120 }}
+            className="flex flex-col items-center justify-center h-screen px-6 glass-panel rounded-3xl mx-4"
+          >
+            <h2 className="text-3xl font-bold mb-12">Кто твой спутник?</h2>
+            <div className="flex flex-col gap-6 w-full max-w-md">
+              {["Девушка", "Парень"].map(g => (
+                <motion.button
+                  key={g}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setPersonality(p => ({ ...p, gender: g }));
+                    setStep("orientation");
+                  }}
+                  className="py-5 bg-glass-dark rounded-2xl text-xl font-medium backdrop-blur-md neon-border"
+                >
+                  {g}
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
+        {/* === ВЫБОР ОРИЕНТАЦИИ === */}
+        {step === "orientation" && (
+          <motion.div
+            key="orientation"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", stiffness: 120 }}
+            className="flex flex-col items-center justify-center h-screen px-6 glass-panel rounded-3xl mx-4"
+          >
+            <h2 className="text-3xl font-bold mb-12">Ориентация?</h2>
+            <div className="flex flex-col gap-6 w-full max-w-md">
+              {["натурал", "гей/лесби", "би"].map(o => (
+                <motion.button
+                  key={o}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setPersonality(p => ({ ...p, orientation: o }));
+                    setStep("style");
+                  }}
+                  className="py-5 bg-glass-dark rounded-2xl text-xl font-medium backdrop-blur-md neon-border"
+                >
+                  {o.charAt(0).toUpperCase() + o.slice(1)}
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* === ВЫБОР СТИЛЯ === */}
+        {step === "style" && (
+          <motion.div
+            key="style"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", stiffness: 120 }}
+            className="flex flex-col items-center justify-center h-screen px-6 glass-panel rounded-3xl mx-4"
+          >
+            <h2 className="text-3xl font-bold mb-12">Стиль общения?</h2>
+            <div className="flex flex-col gap-6 w-full max-w-md">
+              {["нежная", "дерзкая", "покорная", "доминантная"].map(s => (
+                <motion.button
+                  key={s}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setPersonality(p => ({ ...p, style: s }));
+                    setStep("chat");
+                  }}
+                  className="py-5 bg-glass-dark rounded-2xl text-xl font-medium backdrop-blur-md neon-border"
+                >
+                  {s === "нежная" ? "Нежная" : s === "дерзкая" ? "Дерзкая" : s === "покорная" ? "Покорная" : "Доминантная"}
+                </motion.button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* === ЧАТ === */}
         {step === "chat" && (
-          <>
-            <div className="flex-1 overflow-y-auto px-5 pt-20 pb-32 space-y-6">
+          <div className="flex flex-col h-screen">
+            <div className="flex-1 overflow-y-auto px-4 pt-4 pb-36 space-y-5 particles-bg">
               {messages.map((m, i) => (
-                <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[85%] rounded-3xl px-6 py-4 shadow-2xl ${m.role === "user" ? "bg-purple-700" : "bg-pink-700"}`}>
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div className={`max-w-[85%] rounded-3xl px-5 py-3 shadow-2xl text-soft-white glass-panel backdrop-blur-md ${
+                    m.role === "user" 
+                      ? "bg-accent-gradient-1/30 neon-border" 
+                      : "bg-accent-gradient-2/30 neon-border"
+                  }`}>
                     {m.type === "image" ? (
-                      <img src={m.content} alt="18+" className="rounded-2xl w-full max-w-sm mx-auto cursor-pointer border-4 border-purple-500/60"
-                        onClick={() => window.open(m.content, "_blank")} />
+                      <motion.img 
+                        src={m.content} 
+                        alt="18+" 
+                        initial={{ scale: 0.95, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ duration: 0.5 }}
+                        className="rounded-2xl w-full max-w-xs sm:max-w-sm mx-auto border-4 border-emerald-glow/60 shadow-2xl breathing-glow"
+                        loading="lazy"
+                      />
                     ) : (
-                      <p className="text-lg leading-relaxed">{m.content || "..."}</p>
+                      <p className="text-base sm:text-lg leading-relaxed ai-text">{m.content || "..."}</p>
                     )}
                   </div>
                 </motion.div>
@@ -337,28 +320,66 @@ export default function NeonGlowAI() {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-white/10 p-4">
-              <div className="flex items-center gap-4">
-                <input
-                  type="text"
+            {/* Нижняя панель как плавающая док-панель */}
+            <div className="fixed bottom-4 left-4 right-4 bg-glass-dark backdrop-blur-xl rounded-3xl shadow-lg border border-white/10">
+              <div className="p-4 flex items-end gap-3">
+                <textarea
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendTextMessage())}
-                  placeholder="Напиши сообщение..."
-                  className="flex-1 bg-white/10 rounded-full px-6 py-4 text-base outline-none placeholder-white/50"
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
+                  placeholder="Напиши или нажми камеру..."
+                  rows={1}
+                  className="flex-1 bg-transparent rounded-2xl px-5 py-3.5 text-base outline-none resize-none max-h-32 placeholder-secondary-text focus:neon-border"
                 />
-                <button onClick={generatePhoto} disabled={generatingPhoto}
-                  className="p-4 bg-red-600 rounded-full shadow-lg relative">
-                  <Camera className="w-7 h-7" />
-                  {generatingPhoto && <div className="absolute inset-0 border-4 border-t-transparent border-white rounded-full animate-spin" />}
-                </button>
-                <button onClick={sendTextMessage} disabled={sendingText}
-                  className="p-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full shadow-lg">
-                  <Send className="w-7 h-7" />
-                </button>
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setInput("сделай фото")} 
+                  className="p-3.5 bg-accent-gradient-1 rounded-full shadow-lg pulse-glow"
+                >
+                  <Heart className="w-6 h-6" />
+                </motion.button>
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={sendMessage} 
+                  disabled={loading} 
+                  className="p-3.5 bg-accent-gradient-2 rounded-full shadow-lg pulse-glow"
+                >
+                  <MessageCircle className="w-6 h-6" />
+                </motion.button>
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={generatePhoto} 
+                  disabled={generatingPhoto} 
+                  className="p-3.5 bg-accent-gradient-1 rounded-full shadow-lg pulse-glow relative"
+                >
+                  <Camera className="w-6 h-6" />
+                  {generatingPhoto && <div className="absolute inset-0 border-4 border-t-transparent border-toxic-mint rounded-full animate-spin"></div>}
+                </motion.button>
+              </div>
+
+              <div className="flex justify-center gap-6 pb-4">
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={undoLastMessage} 
+                  className="flex items-center gap-2 px-5 py-2 bg-accent-gradient-1/50 rounded-full text-sm neon-border"
+                >
+                  <ChevronLeft className="w-5 h-5" /> Назад
+                </motion.button>
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={resetChat} 
+                  className="px-6 py-2 bg-accent-gradient-2/50 rounded-full text-sm neon-border"
+                >
+                  Новая беседа
+                </motion.button>
               </div>
             </div>
-          </>
+          </div>
         )}
       </AnimatePresence>
     </div>
