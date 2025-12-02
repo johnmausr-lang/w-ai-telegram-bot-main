@@ -1,36 +1,35 @@
-@tailwind base; @tailwind components; @tailwind utilities;
+/* app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@layer base {
+  :root {
+    --pink: #ff2e96;
+    --cyan: #00f5ff;
+    --bg: #000000;
+  }
+}
 
 body {
-  @apply bg-[var(--bg-primary)] text-[var(--text-primary)] font-['Inter'];
-  background: radial-gradient(circle at var(--mouse-x,50%) var(--mouse-y,50%), rgba(255,71,163,0.08) 0%, transparent 50%), #0A0A0E;
+  background: radial-gradient(circle at 50% 50%, #0d0b1f 0%, #000000 70%);
+  color: #e0e0ff;
 }
 
-/* Glassmorphism */
 .glass {
-  background: var(--glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-glass);
+  background: rgba(20, 20, 40, 0.4);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Неоновое свечение */
 .glow-pink {
-  box-shadow: 0 0 20px rgba(255,71,163,0.6);
+  box-shadow: 0 0 40px rgba(255, 46, 150, 0.6);
 }
-.glow-cyan { box-shadow: 0 0 20px rgba(0,204,255,0.6); }
 
-/* Liquid анимация */
-@keyframes liquid { 
-  0%,100% { border-radius: 33% 67% 70% 30% / 40% 60% 40% 60%; } 
-  50% { border-radius: 50% 50% 50% 50% / 60% 40% 60% 40%; } 
+.glow-cyan {
+  box-shadow: 0 0 40px rgba(0, 245, 255, 0.6);
 }
-.liquid { animation: liquid 12s ease-in-out infinite; }
 
-/* Holographic reveal */
-@keyframes holoReveal {
-  0% { clip-path: inset(100% 0 0 0); filter: brightness(3) contrast(3); }
-  50% { clip-path: inset(0% 0 0 0); }
+.text-glow {
+  text-shadow: 0 0 20px rgba(255, 46, 150, 0.8);
 }
-.holo { animation: holoReveal 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
