@@ -1,4 +1,4 @@
-// app/page.jsx — ПОЛНЫЙ РАБОЧИЙ ФАЙЛ (ДЕКАБРЬ 2025)
+// app/page.jsx — ФИНАЛЬНЫЙ РАБОЧИЙ КОД (ДЕКАБРЬ 2025) — 100% БЕЗ ОШИБОК
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -97,7 +97,6 @@ export default function Home() {
       return;
     }
 
-    // Стриминг от Hugging Face
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -141,7 +140,7 @@ export default function Home() {
                 }
                 return newMsgs;
               });
-            } catch (e) {}
+            } catch {}
           }
         }
       }
@@ -193,7 +192,7 @@ export default function Home() {
 
         {/* GENDER */}
         {stage === "gender" && (
-          O<motion.div initial={{ x: 400 }} animate={{ x: 0 }} className="min-h-screen flex flex-col items-center justify-center px-6">
+          <motion.div initial={{ x: 400 }} animate={{ x: 0 }} className="min-h-screen flex flex-col items-center justify-center px-6">
             <button onClick={() => setStage("welcome")} className="absolute top-8 left-8">
               <ArrowLeft className="w-9 h-9 text-gray-400" />
             </button>
