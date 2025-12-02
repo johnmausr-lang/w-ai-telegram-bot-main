@@ -19,12 +19,7 @@ module.exports = {
         'neon-blend': 'linear-gradient(135deg, #FF2FAE 0%, #9011FF 50%, #14E3FF 100%)',
         'pink-glow': 'linear-gradient(90deg, #FF2FAE, #CC1C8F)',
       },
-      backdropBlur: {
-        xs: '4px',
-      },
-      fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-      },
+      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
     },
   },
   plugins: [],
