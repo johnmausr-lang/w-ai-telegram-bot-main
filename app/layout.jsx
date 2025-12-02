@@ -1,27 +1,17 @@
-// Файл: layout.jsx
 import "./globals.css";
 
 export const metadata = {
-  title: "Neon Glow AI",
-  description: "Твой 18+ цифровой спутник",
-};
-
-export const viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  viewportFit: "cover",
+  title: "Chromatic Eclipse",
+  description: "Премиальный 18+ ИИ-компаньон • 2025",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="ru">
       <head>
-        <meta name="theme-color" content="#0B0C12" />
-        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#05050A" />
       </head>
-      <body className="min-h-screen w-screen overflow-hidden bg-deep-onyx text-soft-white antialiased flex flex-col">
+      <body className="min-h-screen bg-eclipse-bg">
         {children}
       </body>
     </html>
