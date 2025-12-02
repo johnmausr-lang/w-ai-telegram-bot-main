@@ -1,30 +1,29 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: [
-    "./app/**/*.{js,jsx,ts,tsx}",
-    "./components/**/*.{js,jsx,ts,tsx}"
-  ],
+  content: ["./app/**/*.{js,jsx,ts,tsx}", "./components/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
-      backdropBlur: {
-        xs: '2px',
-      },
       colors: {
-        'deep-onyx': '#0B0C12',
-        'glass-dark': '#12131B',
-        'neon-crimson': '#FF2E63',
-        'deep-ruby': '#C81D4E',
-        'emerald-glow': '#00D4A1',
-        'emerald-dark': '#00A07A',
-        'soft-white': '#F5F5F5',
-        'secondary-text': '#A0A0A0',
-        'toxic-mint': '#00FFB2',
-        'error-red': '#FF3B6D',
+        'eclipse-bg': '#05050A',
+        'glass-card': '#11111A',
+        'glass-stroke': 'rgba(255,255,255,0.06)',
+        'neon-pink': '#FF2FAE',
+        'neon-cyan': '#14E3FF',
+        'glow-purple': '#9011FF',
+        'text-primary': '#F2F2F7',
+        'text-secondary': '#8F8FA4',
+        'success': '#2AFFC6',
+        'error': '#FF4F6A',
       },
       backgroundImage: {
-        'radial-gradient': 'radial-gradient(circle at center, #0B0C12, #12131B)',
-        'accent-gradient-1': 'linear-gradient(135deg, #FF2E63, #C81D4E)',
-        'accent-gradient-2': 'linear-gradient(135deg, #00D4A1, #00A07A)',
+        'neon-blend': 'linear-gradient(135deg, #FF2FAE 0%, #9011FF 50%, #14E3FF 100%)',
+        'pink-glow': 'linear-gradient(90deg, #FF2FAE, #CC1C8F)',
+      },
+      backdropBlur: {
+        xs: '4px',
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
       },
     },
   },
