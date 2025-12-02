@@ -5,14 +5,17 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export const metadata = {
-  title: "Neon Glow AI",
-  description: "Твой 18+ спутник",
+  title: "Neon Desire",
+  description: "Твой личный 18+ спутник",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="ru">
-      <body className="bg-[#0A0A0E] text-white antialiased overflow-hidden">
+      <head>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+      </head>
+      <body className="bg-black text-white font-['Inter'] antialiased min-h-screen">
         {children}
       </body>
     </html>
