@@ -5,8 +5,8 @@ import { Camera, Send, ChevronLeft, MessageSquare } from "lucide-react";
 
 export default function NeonGlowAI() {
   const [step, setStep] = useState("welcome");
-  const [userGender, setUserGender] = useState(null); // ты
-  const [aiGender, setAiGender] = useState(null);     // AI
+  const [userGender, setUserGender] = useState(null);
+  const [aiGender, setAiGender] = useState(null);
   const [style, setStyle] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -27,13 +27,11 @@ export default function NeonGlowAI() {
   }, []);
 
   const isGay = userGender === "Мужчина" && aiGender === "Мужчина";
-  const isGay;
 
   const styles = isGay
     ? ["Нежный", "Дерзкий", "Покорный", "Доминантный"]
     : ["Нежная", "Дерзкая", "Покорная", "Доминантная"];
 
-  // Генерация фото
   const generatePhoto = async () => {
     if (generating || !input.trim()) return;
     setGenerating(true);
@@ -52,19 +50,17 @@ export default function NeonGlowAI() {
             .concat({ role: "assistant", content: imageUrl, type: "image" })
       );
     } catch {
-      setMessages(prev => prev.concat({ role: "assistant", content: "Ошибка, попробуй ещё" }));
+      setMessages(prev => prev.concat({ role: "assistant", content: "Ошибка генерации" }));
     } finally {
       setGenerating(false);
       setInput("");
     }
   };
 
-  // Отправка сообщения
   const sendMessage = () => {
     if (!input.trim() || generating) return;
     setMessages(prev => [...prev, { role: "user", content: input }]);
-    // Здесь будет твой /api/chat
-    setMessages(prev => [...prev, { role: "assistant", content: "Пока просто заглушка, но скоро будет полноценный чат" }]);
+    setMessages(prev => [...prev, { role: "assistant", content: "Скоро будет полноценный чат с Grok-4" }]);
     setInput("");
   };
 
@@ -74,11 +70,9 @@ export default function NeonGlowAI() {
     if (step === "chat") setStep("style");
   };
 
-  const newDialog = () => {
-    setMessages([]);
-  };
+  const newDialog = () => setMessages([]);
 
-  const changeStyle = (newStyle => {
+  const changeStyle = (newStyle) => {
     setStyle(newStyle);
     setNotification(`Стиль изменён: ${newStyle.toLowerCase()}`);
     setTimeout(() => setNotification(""), 3000);
@@ -86,7 +80,7 @@ export default function NeonGlowAI() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-950 via-pink-900 to-black text-white relative">
-      {/* Уведомление о смене стиля */}
+      {/* Уведомление */}
       <AnimatePresence>
         {notification && (
           <motion.div
@@ -113,22 +107,17 @@ export default function NeonGlowAI() {
       )}
 
       <AnimatePresence mode="wait">
-        {/* Welcome */}
         {step === "welcome" && (
           <motion.div key="w" className="flex-1 flex flex-col items-center justify-center gap-12 px-6 text-center">
             <h1 className="text-6xl md:text-7xl font-bold bg-gradient-to-r from-pink-400 to-purple-600 bg-clip-text text-transparent">
               Твой AI 18+
             </h1>
-            <button
-              onClick={() => setStep("user-gender")}
-              className="px-12 py-5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-2xl font-bold"
-            >
+            <button onClick={() => setStep("user-gender")} className="px-12 py-5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-2xl font-bold">
               Начать
             </button>
           </motion.div>
         )}
 
-        {/* Кто ты? */}
         {step === "user-gender" && (
           <motion.div key="u" className="flex-1 flex flex-col items-center justify-center gap-16 px-6">
             <h2 className="text-5xl font-bold text-center">Кто ты?</h2>
@@ -145,7 +134,6 @@ export default function NeonGlowAI() {
           </motion.div>
         )}
 
-        {/* Кто твой AI? */}
         {step === "ai-gender" && (
           <motion.div key="a" className="flex-1 flex flex-col items-center justify-center gap-16 px-6">
             <h2 className="text-5xl font-bold text-center">Кто будет твоим AI?</h2>
@@ -162,7 +150,6 @@ export default function NeonGlowAI() {
           </motion.div>
         )}
 
-        {/* Стиль */}
         {step === "style" && (
           <motion.div key="s" className="flex-1 flex flex-col items-center justify-center gap-16 px-6">
             <h2 className="text-5xl font-bold text-center">Стиль общения</h2>
@@ -180,20 +167,13 @@ export default function NeonGlowAI() {
           </motion.div>
         )}
 
-        {/* Чат */}
         {step === "chat" && (
           <>
             <div className="flex-1 overflow-y-auto px-5 pt-24 pb-32 space-y-6">
               {messages.map((m, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} mb-4`}
-                >
-                  <div className={`max-w-[85%] rounded-3xl px-6 py-4 shadow-2xl ${
-                    m.role === "user" ? "bg-purple-700" : "bg-pink-700"
-                  }`}>
+                <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"} mb-4`}>
+                  <div className={`max-w-[85%] rounded-3xl px-6 py-4 shadow-2xl ${m.role === "user" ? "bg-purple-700" : "bg-pink-700"}`}>
                     {m.type === "image" ? (
                       <img
                         src={m.content}
@@ -210,7 +190,6 @@ export default function NeonGlowAI() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Нижняя панель — как в Telegram */}
             <div className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-white/10 p-4">
               <div className="flex items-center gap-4">
                 <input
@@ -221,18 +200,11 @@ export default function NeonGlowAI() {
                   placeholder="Напиши сообщение или 'сделай фото'"
                   className="flex-1 bg-white/10 rounded-full px-6 py-4 text-base outline-none placeholder-white/50"
                 />
-                <button
-                  onClick={generatePhoto}
-                  disabled={generating}
-                  className="p-4 bg-red-600 rounded-full shadow-lg relative"
-                >
+                <button onClick={generatePhoto} disabled={generating} className="p-4 bg-red-600 rounded-full shadow-lg relative">
                   <Camera className="w-7 h-7" />
                   {generating && <div className="absolute inset-0 border-4 border-t-transparent border-white rounded-full animate-spin"></div>}
                 </button>
-                <button
-                  onClick={sendMessage}
-                  className="p-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full shadow-lg"
-                >
+                <button onClick={sendMessage} className="p-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full shadow-lg">
                   <Send className="w-7 h-7" />
                 </button>
               </div>
