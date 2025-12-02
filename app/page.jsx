@@ -1,13 +1,17 @@
+// app/page.jsx — ФИНАЛЬНАЯ ВЕРСИЯ ДЛЯ VERCEL (модульная + рабочая)
 "use client";
-import { useState, useEffect, useRef } from "react";
+
+import { useState, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
-import OnboardingFlow from "@/components/OnboardingFlow";
-import ChatScreen from "@/components/ChatScreen";
-import HistorySidebar from "@/components/HistorySidebar";
-import GalleryGrid from "@/components/GalleryGrid";
-import BreathingBackground from "@/components/BreathingBackground";
-import { loadChats, saveChats } from "@/lib/storage";
-import { haptic } from "@/lib/haptic";
+
+// Относительные импорты — работают на Vercel в App Router 100%
+import OnboardingFlow from "./components/OnboardingFlow";
+import ChatScreen from "./components/ChatScreen";
+import HistorySidebar from "./components/HistorySidebar";
+import GalleryGrid from "./components/GalleryGrid";
+import BreathingBackground from "./components/BreathingBackground";
+import { loadChats, saveChats } from "./lib/storage";
+import { haptic } from "./lib/haptic";
 
 const MAX_CHATS = 10;
 
@@ -18,6 +22,7 @@ export default function SleekNocturne() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
 
+  // Загружаем чаты при старте
   useEffect(() => {
     const saved = loadChats();
     if (saved.length > 0) {
@@ -27,6 +32,7 @@ export default function SleekNocturne() {
     }
   }, []);
 
+  // Создание нового чата
   const startNewChat = (personality) => {
     const id = Date.now().toString();
     const newChat = {
@@ -44,10 +50,19 @@ export default function SleekNocturne() {
     haptic("medium");
   };
 
+  // Выбор чата из истории
+  const handleSelectChat = (chat) => {
+    setCurrentChat(chat);
+    setStep("chat");
+    setShowSidebar(false);
+  };
+
   return (
     <>
+      {/* Дышащий фон */}
       <BreathingBackground />
 
+      {/* Основной контент */}
       <AnimatePresence mode="wait">
         {step === "onboarding" && (
           <OnboardingFlow onComplete={startNewChat} />
@@ -63,16 +78,18 @@ export default function SleekNocturne() {
         )}
       </AnimatePresence>
 
+      {/* Боковая панель с историей */}
       <HistorySidebar
         isOpen={showSidebar}
         onClose={() => setShowSidebar(false)}
-        onSelectChat={(chat) => {
-          setCurrentChat(chat);
-          setStep("chat");
-        }}
+        onSelectChat={handleSelectChat}
       />
 
-      <GalleryGrid isOpen={showGallery} onClose={() => setShowGallery(false)} />
+      {/* Галерея изображений */}
+      <GalleryGrid
+        isOpen={showGallery}
+        onClose={() => setShowGallery(false)}
+      />
     </>
   );
 }
