@@ -8,7 +8,6 @@ import { Camera, Send, ChevronLeft, MessageSquare, Trash2, Menu } from "lucide-r
 const STORAGE_KEY = "neon_ai_chats_2025";
 
 export default function NeonGlowAI() {
-  // === СОСТОЯНИЯ ===
   const [step, setStep] = useState("welcome");
   const [userGender, setUserGender] = useState(null);
   const [aiGender, setAiGender] = useState(null);
@@ -26,7 +25,7 @@ export default function NeonGlowAI() {
 
   const messagesEndRef = useRef(null);
 
-  // === ЗАГРУЗКА И СОХРАНЕНИЕ ДИАЛОГОВ ===
+  // Загрузка диалогов
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -38,6 +37,7 @@ export default function NeonGlowAI() {
     } catch (e) {}
   }, []);
 
+  // Сохранение диалогов
   useEffect(() => {
     if (chats.length > 0) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
@@ -60,7 +60,7 @@ export default function NeonGlowAI() {
     ? ["Нежный", "Дерзкий", "Покорный", "Доминантный"]
     : ["Нежная", "Дерзкая", "Покорная", "Доминантная"];
 
-  // === РАБОТА С ДИАЛОГАМИ ===
+  // === ДИАЛОГИ ===
   const createNewChat = () => {
     const newChat = {
       id: Date.now().toString(),
@@ -115,7 +115,7 @@ export default function NeonGlowAI() {
     }
   }, [messages, currentChatId]);
 
-  // === ГЕНЕРАЦИЯ ФОТО (ТОЛЬКО ПО КНОПКЕ КАМЕРЫ) ===
+  // === ГЕНЕРАЦИЯ ФОТО ===
   const generatePhoto = async () => {
     if (generatingPhoto || !input.trim()) return;
     setGeneratingPhoto(true);
@@ -142,7 +142,7 @@ export default function NeonGlowAI() {
     }
   };
 
-  // === ОТПРАВКА ТЕКСТА (Enter + кнопка отправить) ===
+  // === ОТПРАВКА ТЕКСТА ===
   const sendTextMessage = async () => {
     if (!input.trim() || generatingPhoto || sendingText) return;
     const userText = input.trim();
@@ -213,7 +213,6 @@ export default function NeonGlowAI() {
     setStep("chat");
   };
 
-  // === РЕНДЕР ===
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-purple-950 via-pink-900 to-black text-white relative">
 
@@ -234,7 +233,7 @@ export default function NeonGlowAI() {
             className="fixed inset-y-0 left-0 w-80 bg-black/90 backdrop-blur-xl z-50 border-r border-white/10 flex flex-col">
             <div className="p-5 border-b border-white/10 flex justify-between items-center">
               <h2 className="text-xl font-bold">Диалоги</h2>
-              <button onClick={() => setSidebarOpen(false)}><ChevronLeft /></button>
+              <button onClick={() => setSidebarOpen(false)}><ChevronLeft className="w-6 h-6" /></button>
             </div>
             <button onClick={createNewChat} className="mx-4 mt-4 mb-6 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl font-bold">
               + Новый диалог
@@ -265,12 +264,81 @@ export default function NeonGlowAI() {
         </button>
       )}
 
-      {/* Основные экраны — без изменений (welcome, выбор пола, стиль) */}
+      {/* Верхняя панель */}
+      {step !== "welcome" && (
+        <div className="fixed top-0 left-0 right-0 z-40 bg-black/70 backdrop-blur-lg border-b border-white/10 p-4 flex justify-between items-center">
+          <button onClick={() => setStep(step === "chat" ? "style" : step === "style" ? "ai-gender" : "user-gender")}
+            className="flex items-center gap-2 px-5 py-2.5 bg-red-600/80 rounded-full text-base font-medium">
+            <ChevronLeft className="w-5 h-5" /> Назад
+          </button>
+          <button onClick={createNewChat}
+            className="flex items-center gap-2 px-5 py-2.5 bg-purple-600/80 rounded-full text-base font-medium">
+            <MessageSquare className="w-5 h-5" /> Новый диалог
+          </button>
+        </div>
+      )}
+
       <AnimatePresence mode="wait">
-        {step === "welcome" && /* ... как раньше ... */}
-        {step === "user-gender" && /* ... как раньше ... */}
-        {step === "ai-gender" && /* ... как раньше ... */}
-        {step === "style" && /* ... как раньше ... */}
+        {/* WELCOME */}
+        {step === "welcome" && (
+          <motion.div key="welcome" className="flex-1 flex flex-col items-center justify-center gap-12 px-6 text-center">
+            <h1 className="text-6xl md:text-7xl font-bold bg-gradient-to-r from-pink-400 to-purple-600 bg-clip-text text-transparent">
+              Твой AI 18+
+            </h1>
+            <button onClick={createNewChat} className="px-12 py-6 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-2xl font-bold shadow-2xl">
+              Начать
+            </button>
+          </motion.div>
+        )}
+
+        {/* USER GENDER */}
+        {step === "user-gender" && (
+          <motion.div key="user" className="flex-1 flex flex-col items-center justify-center gap-16 px-6">
+            <h2 className="text-5xl font-bold text-center">Кто ты?</h2>
+            <div className="flex gap-10">
+              <button onClick={() => { setUserGender("Девушка"); setStep("ai-gender"); }}
+                className="px-16 py-10 rounded-3xl bg-gradient-to-br from-pink-500 to-purple-600 text-3xl font-bold shadow-2xl">
+                Девушка
+              </button>
+              <button onClick={() => { setUserGender("Мужчина"); setStep("ai-gender"); }}
+                className="px-16 py-10 rounded-3xl bg-gradient-to-br from-blue-500 to-purple-600 text-3xl font-bold shadow-2xl">
+                Парень
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* AI GENDER */}
+        {step === "ai-gender" && (
+          <motion.div key="ai" className="flex-1 flex flex-col items-center justify-center gap-16 px-6">
+            <h2 className="text-5xl font-bold text-center">Кто будет твоим AI?</h2>
+            <div className="flex gap-10">
+              <button onClick={() => { setAiGender("Девушка"); setStep("style"); }}
+                className="px-16 py-10 rounded-3xl bg-gradient-to-br from-pink-500 to-purple-600 text-3xl font-bold shadow-2xl">
+                Девушка
+              </button>
+              <button onClick={() => { setAiGender("Мужчина"); setStep("style"); }}
+                className="px-16 py-10 rounded-3xl bg-gradient-to-br from-blue-500 to-purple-600 text-3xl font-bold shadow-2xl">
+                Парень
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* STYLE */}
+        {step === "style" && (
+          <motion.div key="style" className="flex-1 flex flex-col items-center justify-center gap-16 px-6">
+            <h2 className="text-5xl font-bold text-center">Стиль общения</h2>
+            <div className="grid grid-cols-2 gap-8 max-w-lg w-full">
+              {styles.map(s => (
+                <button key={s} onClick={() => changeStyle(s)}
+                  className="py-8 rounded-3xl bg-gradient-to-br from-purple-600 to-pink-600 text-2xl font-bold shadow-2xl">
+                  {s}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
 
         {/* ЧАТ */}
         {step === "chat" && (
@@ -293,7 +361,6 @@ export default function NeonGlowAI() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Нижняя панель */}
             <div className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-white/10 p-4">
               <div className="flex items-center gap-4">
                 <input
