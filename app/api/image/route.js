@@ -3,11 +3,14 @@ import { NextResponse } from "next/server";
 
 export const POST = async (req) => {
   try {
-    {
     const { prompt = "" } = await req.json();
     const FAL_KEY = process.env.FAL_KEY;
 
-    if (!FAL_KEY) throw new Error("No key");
+    if (!FAL_KEY) {
+      return NextResponse.json({
+        imageUrl: "https://i.redd.it/9vz2q2v9o0xd1.jpeg"
+      });
+    }
 
     const isGay = /парен|мужчин|член|гей|мужик|парня|хуй|пенис/i.test(prompt.toLowerCase());
 
@@ -36,14 +39,14 @@ export const POST = async (req) => {
     const data = await res.json();
     const url = data.images?.[0]?.url;
 
-    if (!url) throw new Error("no url");
+    if (!url) throw new Error("no image url");
 
     return NextResponse.json({ imageUrl: url });
+
   } catch (e) {
     console.error("Image gen error:", e);
-    // Всегда красивое фото, даже если упало
     return NextResponse.json({
-      imageUrl: "https://i.redd.it/9vz2q2v9o0xd1.jpeg" // ← вечная голая девушка (живёт вечно)
+      imageUrl: "https://i.redd.it/9vz2q2v9o0xd1.jpeg"
     });
   }
 };
