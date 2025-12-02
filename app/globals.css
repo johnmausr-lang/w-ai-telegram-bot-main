@@ -1,53 +1,15 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@tailwind base; @tailwind components; @tailwind utilities;
 
-body {
-  @apply bg-eclipse-bg text-text-primary antialiased;
-}
+body { @apply bg-eclipse-bg text-text-primary antialiased; }
 
-/* Liquid transition */
-@keyframes liquid {
-  0%, 100% { border-radius: 33% 67% 67% 33% / 44% 56% 44% 56%; }
-  50% { border-radius: 50% 50% 50% 50% / 60% 40% 60% 40%; }
-}
-
-/* Neon pulse */
-@keyframes neonPulse {
-  0%, 100% { box-shadow: 0 0 15px rgba(255, 47, 174, 0.6); }
-  50% { box-shadow: 0 0 30px rgba(255, 47, 174, 1); }
-}
+@keyframes liquid { 0%,100% { border-radius: 33% 67% 67% 33%/44% 56% 44% 56%; } 50% { border-radius: 50% 50% 50% 50%/60% 40% 60% 40%; } }
+@keyframes neonPulse { 0%,100% { box-shadow: 0 0 15px rgba(255,47,174,.6); } 50% { box-shadow: 0 0 35px rgba(255,47,174,1); } }
+@keyframes bounceIn { 0% { opacity:0; transform:translateY(30px) scale(.9); } 60% { opacity:1; transform:translateY(-10px) scale(1.05); } 100% { transform:translateY(0) scale(1); } }
 
 .neon-pulse { animation: neonPulse 2s ease-in-out infinite; }
 .liquid { animation: liquid 8s ease-in-out infinite; }
-
-/* Glass panel */
-.glass {
-  background: rgba(17, 17, 26, 0.6);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.06);
-}
-
-/* Blur preview */
-.blur-preview {
-  filter: blur(12px);
-  transition: filter 0.4s ease;
-}
-.blur-preview.revealed {
-  filter: none;
-}
-
-/* Neon border */
-.neon-border-pink {
-  border: 1px solid transparent;
-  background: linear-gradient(#11111A, #11111A) padding-box,
-              linear-gradient(135deg, #FF2FAE, #9011FF) border-box;
-}
-
-/* Overshoot bounce */
-@keyframes bounceIn {
-  0% { opacity: 0; transform: translateY(30px) scale(0.9); }
-  60% { opacity: 1; transform: translateY(-10px) scale(1.05); }
-  100% { transform: translateY(0) scale(1); }
-}
-.bounce-in { animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+.glass { background: rgba(17,17,26,.6); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,.06); }
+.neon-border-pink { border: 1px solid transparent; background: linear-gradient(#11111A,#11111A) padding-box, linear-gradient(135deg,#FF2FAE,#9011FF) border-box; }
+.blur-preview { filter: blur(12px); transition: filter .4s; }
+.blur-preview.revealed { filter: none; }
+.bounce-in { animation: bounceIn .6s cubic-bezier(.68,-.55,.265,1.55); }
