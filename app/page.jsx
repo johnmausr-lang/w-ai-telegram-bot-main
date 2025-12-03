@@ -1,11 +1,10 @@
-// app/page.jsx — ПОЛНОСТЬЮ ЗАМЕНИТЬ
+// app/page.jsx — ЗАМЕНИ ЭТОТ ФАЙЛ ПОЛНОСТЬЮ
 "use client";
 
 import { AnimatePresence } from "framer-motion";
 import WelcomeScreen from "../components/WelcomeScreen";
 import UserGenderStep from "../components/setup/UserGenderStep";
 import GenderStep from "../components/setup/GenderStep";
-import OrientationStep from "../components/setup/OrientationStep";
 import StyleStep from "../components/setup/StyleStep";
 import ChatLayout from "../components/chat/ChatLayout";
 import useChat from "../hooks/useChat";
@@ -29,23 +28,20 @@ export default function NeonGlowAI() {
 
   // Универсальная кнопка «Назад»
   const goBack = () => {
-    const steps = ["user-gender", "gender", "orientation", "style", "chat"];
-    const currentIndex = steps.indexOf(step);
-    if (currentIndex > 0) {
-      setStep(steps[currentIndex - 1]);
-    } else {
-      setStep("welcome");
-    }
+    const order = ["user-gender", "gender", "style", "chat"];
+    const idx = order.indexOf(step);
+    if (idx > 0) setStep(order[idx - 1]);
+    else setStep("welcome");
   };
 
   return (
     <div className="min-h-screen w-screen neon-bg flex flex-col">
-      {/* КНОПКА НАЗАД — появляется со второго шага */}
+      {/* Кнопка Назад — появляется со второго шага */}
       {step !== "welcome" && step !== "chat" && (
         <div className="fixed top-4 left-4 z-50">
           <button
             onClick={goBack}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-xl rounded-full text-sm hover:bg-white/20 transition-all"
+            className="flex items-center gap-2 px-5 py-2 bg-white/10 backdrop-blur-xl rounded-full text-sm hover:bg-white/20 transition-all"
           >
             ← Назад
           </button>
@@ -56,7 +52,6 @@ export default function NeonGlowAI() {
         {step === "welcome" && <WelcomeScreen onStart={() => setStep("user-gender")} />}
         {step === "user-gender" && <UserGenderStep personality={personality} setPersonality={setPersonality} setStep={setStep} />}
         {step === "gender" && <GenderStep personality={personality} setPersonality={setPersonality} setStep={setStep} />}
-        {step === "orientation" && <OrientationStep personality={personality} setPersonality={setPersonality} setStep={setStep} />}
         {step === "style" && <StyleStep personality={personality} setPersonality={setPersonality} setStep={setStep} onComplete={() => setStep("chat")} />}
         {step === "chat" && (
           <ChatLayout
