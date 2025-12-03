@@ -1,5 +1,3 @@
-// app/page.jsx — ФИНАЛЬНАЯ РАБОЧАЯ ВЕРСИЯ (декабрь 2025)
-
 "use client";
 
 import { AnimatePresence } from "framer-motion";
@@ -28,10 +26,10 @@ export default function NeonGlowAI() {
     showHeart,
   } = useChat();
 
-  // ГАРАНТИРОВАННЫЙ ПЕРЕХОД В ЧАТ ПОСЛЕ ВЫБОРА СТИЛЯ
+  // Переход в чат после выбора стиля
   const handleStyleComplete = () => {
-    console.log("Все шаги пройдены → переход в чат");
-    setStep("chat"); // ← ЭТО ГЛАВНОЕ!
+    console.log("Все настройки завершены → переходим в чат");
+    setStep("chat");
   };
 
   // Кнопка Назад
@@ -43,7 +41,7 @@ export default function NeonGlowAI() {
 
   return (
     <div className="min-h-screen w-screen neon-bg flex flex-col">
-      {/* Кнопка Назад — только на настройках */}
+      {/* Кнопка Назад */}
       {(step === "user-gender" || step === "gender" || step === "style") && (
         <div className="fixed top-4 left-4 z-50">
           <button
@@ -55,15 +53,12 @@ export default function NeonGlowAI() {
         </div>
       )}
 
-      {/* Основной контент */}
       <div className="flex-1 flex items-center justify-center relative">
         <AnimatePresence mode="wait">
-          {/* 1. Welcome */}
           {step === "welcome" && (
             <WelcomeScreen key="welcome" onStart={() => setStep("user-gender")} />
           )}
 
-          {/* 2. Кто ты? */}
           {step === "user-gender" && (
             <UserGenderStep
               key="user-gender"
@@ -73,7 +68,6 @@ export default function NeonGlowAI() {
             />
           )}
 
-          {/* 3. Кто тебе нравится? */}
           {step === "gender" && (
             <GenderStep
               key="gender"
@@ -83,18 +77,17 @@ export default function NeonGlowAI() {
             />
           )}
 
-          {/* 4. Стиль — ФИНАЛЬНЫЙ ШАГ */}
           {step === "style" && (
             <StyleStep
               key="style"
               personality={personality}
               setPersonality={setPersonality}
               setStep={setStep}
-              onComplete={handleStyleComplete} // ← ГАРАНТИЯ ПЕРЕХОДА!
+              onComplete={handleStyleComplete}
             />
           )}
 
-          {/* 5. ЧАТ — ПОКАЗЫВАЕТСЯ ТОЛЬКО КОГДА step === "chat" */}
+          {/* ЧАТ — ВСЕ ПРОПСЫ ПЕРЕДАНЫ ПРАВИЛЬНО! */}
           {step === "chat" && (
             <ChatLayout
               key="chat"
