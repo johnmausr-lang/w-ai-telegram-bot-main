@@ -1,4 +1,4 @@
-// app/page.jsx — РАБОЧАЯ ВЕРСИЯ 100% (декабрь 2025)
+// app/page.jsx — ФИНАЛЬНАЯ РАБОЧАЯ ВЕРСИЯ (декабрь 2025)
 
 "use client";
 
@@ -28,7 +28,13 @@ export default function NeonGlowAI() {
     showHeart,
   } = useChat();
 
-  // Кнопка Назад — работает на всех шагах
+  // ГАРАНТИРОВАННЫЙ ПЕРЕХОД В ЧАТ ПОСЛЕ ВЫБОРА СТИЛЯ
+  const handleStyleComplete = () => {
+    console.log("Все шаги пройдены → переход в чат");
+    setStep("chat"); // ← ЭТО ГЛАВНОЕ!
+  };
+
+  // Кнопка Назад
   const goBack = () => {
     if (step === "user-gender") setStep("welcome");
     else if (step === "gender") setStep("user-gender");
@@ -37,7 +43,7 @@ export default function NeonGlowAI() {
 
   return (
     <div className="min-h-screen w-screen neon-bg flex flex-col">
-      {/* Кнопка Назад — только на шагах настройки */}
+      {/* Кнопка Назад — только на настройках */}
       {(step === "user-gender" || step === "gender" || step === "style") && (
         <div className="fixed top-4 left-4 z-50">
           <button
@@ -49,22 +55,46 @@ export default function NeonGlowAI() {
         </div>
       )}
 
-      {/* ВСЁ ОСТАЛЬНОЕ — ПО ЦЕНТРУ */}
+      {/* Основной контент */}
       <div className="flex-1 flex items-center justify-center relative">
         <AnimatePresence mode="wait">
-          {/* ОБЯЗАТЕЛЬНО key={step} — ЭТО ГЛАВНАЯ ПРИЧИНА БАГА! */}
-          {step === "welcome" && <WelcomeScreen key="welcome" onStart={() => setStep("user-gender")} />}
-          {step === "user-gender" && <UserGenderStep key="user-gender" personality={personality} setPersonality={setPersonality} setStep={setStep} />}
-          {step === "gender" && <GenderStep key="gender" personality={personality} setPersonality={setPersonality} setStep={setStep} />}
+          {/* 1. Welcome */}
+          {step === "welcome" && (
+            <WelcomeScreen key="welcome" onStart={() => setStep("user-gender")} />
+          )}
+
+          {/* 2. Кто ты? */}
+          {step === "user-gender" && (
+            <UserGenderStep
+              key="user-gender"
+              personality={personality}
+              setPersonality={setPersonality}
+              setStep={setStep}
+            />
+          )}
+
+          {/* 3. Кто тебе нравится? */}
+          {step === "gender" && (
+            <GenderStep
+              key="gender"
+              personality={personality}
+              setPersonality={setPersonality}
+              setStep={setStep}
+            />
+          )}
+
+          {/* 4. Стиль — ФИНАЛЬНЫЙ ШАГ */}
           {step === "style" && (
             <StyleStep
               key="style"
               personality={personality}
               setPersonality={setPersonality}
               setStep={setStep}
-              onComplete={() => setStep("chat")}
+              onComplete={handleStyleComplete} // ← ГАРАНТИЯ ПЕРЕХОДА!
             />
           )}
+
+          {/* 5. ЧАТ — ПОКАЗЫВАЕТСЯ ТОЛЬКО КОГДА step === "chat" */}
           {step === "chat" && (
             <ChatLayout
               key="chat"
