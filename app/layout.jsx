@@ -1,6 +1,6 @@
-// app/layout.jsx
+// app/layout.jsx — ЧИСТАЯ ВЕРСИЯ (декабрь 2025)
+
 import "./globals.css";
-import { Sparkles } from "lucide-react";
 
 export const metadata = {
   title: "Neon Glow AI",
@@ -19,8 +19,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ru">
       <head>
+        {/* УДАЛЕНО: <link rel="manifest" href="/manifest.json" /> */}
+        {/* УДАЛЕНО: favicon теперь в public/favicon.ico — подхватится сам */}
         <meta name="theme-color" content="#000000" />
-        <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="min-h-screen w-screen overflow-hidden bg-black text-white antialiased flex flex-col">
         {children}
