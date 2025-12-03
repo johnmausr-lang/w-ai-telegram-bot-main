@@ -1,4 +1,4 @@
-// app/page.jsx — РАБОЧАЯ ВЕРСИЯ (декабрь 2025)
+// app/page.jsx — ФИНАЛЬНАЯ ВЕРСИЯ (декабрь 2025)
 
 "use client";
 
@@ -27,11 +27,11 @@ export default function NeonGlowAI() {
     resetChat,
   } = useChat();
 
-  // Кнопка «Назад» — работает идеально
+  // Кнопка «Назад» — чётко по одному шагу назад
   const goBack = () => {
-    if (step === "gender") setStep("user-gender");
+    if (step === "user-gender") setStep("welcome");
+    else if (step === "gender") setStep("user-gender");
     else if (step === "style") setStep("gender");
-    else if (step === "user-gender") setStep("welcome");
   };
 
   return (
@@ -48,33 +48,47 @@ export default function NeonGlowAI() {
         </div>
       )}
 
-      {/* ВСЁ ПО ЦЕНТРУ — как было изначально */}
+      {/* Основной контент — всегда по центру */}
       <div className="flex-1 flex items-center justify-center px-6">
         <AnimatePresence mode="wait">
-          {/* 1. Welcome */}
-          {step === "welcome" && <WelcomeScreen onStart={() => setStep("user-gender")} />}
+          {/* 1. Приветствие */}
+          {step === "welcome" && (
+            <WelcomeScreen onStart={() => setStep("user-gender")} />
+          )}
 
-          {/* 2. Кто ты? — только Парень / Девушка */}
+          {/* 2. Кто ты? */}
           {step === "user-gender" && (
-            <UserGenderStep personality={personality} setPersonality={setPersonality} setStep={setStep} />
+            <UserGenderStep
+              personality={personality}
+              setPersonality={setPersonality}
+              setStep={setStep}
+            />
           )}
 
           {/* 3. Кто тебя заводит? */}
           {step === "gender" && (
-            <GenderStep personality={personality} setPersonality={setPersonality} setStep={setStep} />
+            <GenderStep
+              personality={personality}
+              setPersonality={setPersonality}
+              setStep={setStep}
+            />
           )}
 
-          {/* 4. Стиль общения → потом сразу в чат */}
+          {/* 4. Стиль общения → ПЕРЕХОД В ЧАТ ГАРАНТИРОВАН */}
           {step === "style" && (
             <StyleStep
               personality={personality}
               setPersonality={setPersonality}
               setStep={setStep}
-              onComplete={() => setStep("chat")}  // ← ГАРАНТИРОВАННЫЙ ПЕРЕХОД
+              onComplete={() => {
+                // ← ДВОЙНАЯ ГАРАНТИЯ ПЕРЕХОДА
+                console.log("→ Переход в чат...");
+                setStep("chat");
+              }}
             />
           )}
 
-          {/* 5. Чат */}
+          {/* 5. Чат — с премиум хедером */}
           {step === "chat" && (
             <ChatLayout
               messages={messages}
@@ -86,6 +100,7 @@ export default function NeonGlowAI() {
               generatePhoto={generatePhoto}
               undoLastMessage={undoLastMessage}
               resetChat={resetChat}
+              personality={personality}   // ← Обязательно для имени и аватарки
             />
           )}
         </AnimatePresence>
