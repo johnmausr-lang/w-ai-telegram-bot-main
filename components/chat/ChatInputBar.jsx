@@ -1,6 +1,6 @@
-// components/chat/ChatInputBar.jsx — ФИНАЛЬНАЯ ВЕРСИЯ С ЛЕТЯЩИМ СЕРДЕЧКОМ
+// components/chat/ChatInputBar.jsx — ИСПРАВЛЕННАЯ ВЕРСИЯ (ДЕКАБРЬ 2025)
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";  // ← ЭТО БЫЛО ПОТЕРЯНО!
 import { Heart, MessageCircle, Camera } from "lucide-react";
 
 export default function ChatInputBar({
@@ -10,7 +10,7 @@ export default function ChatInputBar({
   generatingPhoto,
   sendMessage,
   generatePhoto,
-  showHeart, // ← приходит из useChat.js
+  showHeart,
 }) {
   return (
     <>
@@ -30,7 +30,6 @@ export default function ChatInputBar({
           className="flex-1 bg-white/10 backdrop-blur-xl rounded-2xl px-5 py-3.5 text-base outline-none resize-none max-h-32 placeholder-white/50 scrollbar-hide focus:ring-2 focus:ring-purple-500/50 transition-all"
         />
 
-        {/* Кнопка быстрого сердечка */}
         <button
           onClick={() => setInput((prev) => prev + " ❤️")}
           className="p-3.5 bg-pink-600 rounded-full shadow-lg hover:scale-110 transition-transform"
@@ -38,7 +37,6 @@ export default function ChatInputBar({
           <Heart className="w-6 h-6" />
         </button>
 
-        {/* Отправить */}
         <button
           onClick={sendMessage}
           disabled={loading}
@@ -47,7 +45,6 @@ export default function ChatInputBar({
           <MessageCircle className="w-6 h-6" />
         </button>
 
-        {/* Фото */}
         <button
           onClick={generatePhoto}
           disabled={generatingPhoto}
@@ -60,7 +57,7 @@ export default function ChatInputBar({
         </button>
       </div>
 
-      {/* АНИМАЦИЯ ЛЕТЯЩЕГО СЕРДЕЧКА */}
+      {/* ЛЕТЯЩЕЕ СЕРДЕЧКО — теперь работает! */}
       <AnimatePresence>
         {showHeart && (
           <motion.div
