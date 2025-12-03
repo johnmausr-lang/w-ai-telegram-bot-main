@@ -1,7 +1,8 @@
-// components/setup/StyleStep.jsx — ИСПРАВЛЕНО: ТЕКСТ В КНОПКАХ НЕ ВЫЛЕЗАЕТ
+// components/setup/StyleStep.jsx — КРАСИВЫЙ ПЕРЕХОД В ЧАТ
+
 import { motion } from "framer-motion";
 
-export default function StyleStep({ personality, setPersonality, setStep, onComplete }) {
+export default function StyleStep({ personality, setPersonality, setStep }) {
   const styles = [
     { value: "нежная", label: "Нежная" },
     { value: "дерзкая", label: "Дерзкая" },
@@ -11,7 +12,8 @@ export default function StyleStep({ personality, setPersonality, setStep, onComp
 
   const handleSelect = (style) => {
     setPersonality(p => ({ ...p, style }));
-    onComplete();
+    setStep("loading"); // → ЭКРАН ЗАГРУЗКИ
+    setTimeout(() => setStep("chat"), 3200); // → ЧЕРЕЗ 3.2 СЕКУНДЫ — ЧАТ
   };
 
   return (
