@@ -1,7 +1,8 @@
+// app/page.jsx
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Heart, MessageCircle, Camera, ChevronLeft } from "lucide-react";
+import { Heart, MessageCircle, Camera, ChevronLeft, Sparkles } from "lucide-react";
 
 export default function NeonGlowAI() {
   const [step, setStep] = useState("welcome");
@@ -20,7 +21,6 @@ export default function NeonGlowAI() {
   const messagesEndRef = useRef(null);
   const audioRef = useRef(null);
 
-  // Автопрокрутка
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -32,14 +32,14 @@ export default function NeonGlowAI() {
     }
   }, []);
 
-  // === TTS (голос) ===
+  // === TTS ===
   const speak = useCallback(async (text) => {
-    if (!text || !text.trim()) return;
+    if (!text?.trim()) return;
     try {
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice: "shimmer" }),
+        body: JSON.stringify({ text }),
       });
       if (!res.ok) return;
       const blob = await res.blob();
@@ -51,7 +51,7 @@ export default function NeonGlowAI() {
     } catch (e) {}
   }, []);
 
-  // === Чат со стримингом ===
+  // === Отправка сообщения ===
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
     const userMsg = input.trim();
@@ -101,9 +101,8 @@ export default function NeonGlowAI() {
         }
       }
 
-      // Озвучиваем ответ
-      const reply = messages[messages.length - 1]?.content || "";
-      if (reply) speak(reply);
+      const finalReply = messages[messages.length - 1]?.content || "";
+      if (finalReply) speak(finalReply);
 
     } catch (err) {
       setMessages(prev => {
@@ -118,7 +117,7 @@ export default function NeonGlowAI() {
 
   // === Генерация фото ===
   const generatePhoto = async () => {
-    if (generatingPhoto) return;
+    if (generatingPhoto || !input.trim()) return;
     setGeneratingPhoto(true);
 
     setMessages(prev => [...prev, { role: "assistant", content: "Генерирую горячее фото... (15–25 сек)" }]);
@@ -132,75 +131,94 @@ export default function NeonGlowAI() {
 
       const { imageUrl } = await res.json();
 
-      setMessages(prev =>
-        prev.filter(m => m.content !== "Генерирую горячее фото... (15–25 сек)")
-            .concat({ role: "assistant", content: imageUrl, type: "image" })
+      setMessages(prev => prev
+        .filter(m => m.content !== "Генерирую горячее фото... (15–25 сек)")
+        .concat({ role: "assistant", content: imageUrl, type: "image" })
       );
     } catch (e) {
-      setMessages(prev => prev.filter(m => m.content !== "Генерирую горячее фото... (15–25 сек)")
-        .concat({ role: "assistant", content: "Не получилось сгенерировать... попробуй ещё" })
+      setMessages(prev => prev
+        .filter(m => m.content !== "Генерирую горячее фото... (15–25 сек)")
+        .concat({ role: "assistant", content: "Не получилось… попробуй другой запрос" })
       );
     } finally {
       setGeneratingPhoto(false);
     }
   };
 
-  const undoLastMessage = () => setMessages(prev => prev.length >= 2 ? prev.slice(0, -2) : prev);
-  const resetChat = () => { setMessages([]); setStep("welcome"); };
+  // === Управление чатом ===
+  const undoLastMessage = () => {
+    setMessages(prev => prev.slice(0, -2));
+  };
+
+  const resetChat = () => {
+    setMessages([]);
+    setStep("welcome");
+  };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-950 via-pink-900 to-black text-white overflow-hidden">
+    <div className="min-h-screen w-screen neon-bg flex items-center justify-center">
       <audio ref={audioRef} />
 
       <AnimatePresence mode="wait">
-        {/* === ОНБОРДИНГ === */}
+        {/* === WELCOME === */}
         {step === "welcome" && (
-          <motion.div key="welcome" className="flex-1 flex flex-col items-center justify-center px-6 gap-10 text-center">
-            <motion.h1
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ repeat: Infinity, duration: 4 }}
-              className="text-5xl sm:text-6xl md:text-7xl font-bold bg-gradient-to-r from-pink-400 to-purple-600 bg-clip-text text-transparent"
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center flex flex-col items-center justify-center gap-12 px-6"
+          >
+            <div className="relative">
+              <Sparkles className="w-24 h-24 text-pink-500 absolute -top-12 -left-12 animate-pulse" />
+              <h1 className="text-6xl sm:text-8xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
+                Neon Glow AI
+              </h1>
+              <p className="text-xl mt-4 text-purple-300">Твой 18+ цифровой спутник</p>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              onClick={() => setStep("gender")}
+              className="px-12 py-8 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-3xl font-bold pulse-glow"
             >
-              Твой AI 18+
-            </motion.h1>
-            <p className="text-xl sm:text-2xl opacity-90">Без цензуры • Голос • Голые фото</p>
-            <motion.button whileHover={{ scale: 1.1 }} onClick={() => setStep("gender")}
-              className="px-10 py-5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-2xl font-bold shadow-2xl">
               Начать
             </motion.button>
           </motion.div>
         )}
 
+        {/* === GENDER === */}
         {step === "gender" && (
-          <motion.div key="gender" className="flex-1 flex flex-col items-center justify-center gap-12 px-6">
-            <h2 className="text-4xl sm:text-5xl font-bold text-center">Кто будет твоим AI?</h2>
-            <div className="flex flex-col sm:flex-row gap-8">
-              <motion.button whileHover={{ scale: 1.1 }} onClick={() => { setPersonality(p => ({...p, gender: "Женщина"})); setStep("orientation"); }}
-                className="px-12 py-6 rounded-full bg-gradient-to-r from-pink-500 to-purple-500 text-2xl font-bold">Девушка</motion.button>
-              <motion.button whileHover={{ scale: 1.1 }} onClick={() => { setPersonality(p => ({...p, gender: "Мужчина"})); setStep("orientation"); }}
-                className="px-12 py-6 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 text-2xl font-bold">Парень</motion.button>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center flex flex-col items-center justify-center gap-12 px-6">
+            <h2 className="text-4xl sm:text-5xl font-bold">Кто тебя заводит?</h2>
+            <div className="grid grid-cols-2 gap-6 w-full max-w-lg">
+              {["Девушка", "Парень"].map(g => (
+                <motion.button key={g} whileHover={{ scale: 1.1 }}
+                  onClick={() => { setPersonality(p => ({...p, gender: g})); setStep("orientation"); }}
+                  className="px-8 py-6 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-xl font-bold">
+                  {g}
+                </motion.button>
+              ))}
             </div>
           </motion.div>
         )}
 
+        {/* === ORIENTATION === */}
         {step === "orientation" && (
-          <motion.div key="orient" className="flex-1 flex flex-col items-center justify-center gap-12 px-6">
-            <h2 className="text-4xl sm:text-5xl font-bold text-center">Ориентация</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-2xl">
-              <motion.button whileHover={{ scale: 1.1 }} onClick={() => { setPersonality(p => ({...p, orientation: "натурал"})); setStep("style"); }}
-                className="px-8 py-5 rounded-full bg-pink-600 text-xl font-bold">Натурал</motion.button>
-              <motion.button whileHover={{ scale: 1.1 }} onClick={() => { setPersonality(p => ({...p, orientation: "би"})); setStep("style"); }}
-                className="px-8 py-5 rounded-full bg-purple-600 text-xl font-bold">Би</motion.button>
-              <motion.button whileHover={{ scale: 1.1 }} onClick={() => { setPersonality(p => ({...p, orientation: p.gender === "Мужчина" ? "гей" : "лесби"})); setStep("style"); }}
-                className="px-8 py-5 rounded-full bg-red-600 text-xl font-bold">
-                {personality.gender === "Мужчина" ? "Гей" : "Лесби"}
-              </motion.button>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center flex flex-col items-center justify-center gap-12 px-6">
+            <h2 className="text-4xl sm:text-5xl font-bold">Ориентация</h2>
+            <div className="grid grid-cols-1 gap-6 w-full max-w-lg">
+              {["натурал", "би", "гей/лесби"].map(o => (
+                <motion.button key={o} whileHover={{ scale: 1.1 }}
+                  onClick={() => { setPersonality(p => ({...p, orientation: o})); setStep("style"); }}
+                  className="px-8 py-6 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-xl font-bold capitalize">
+                  {o}
+                </motion.button>
+              ))}
             </div>
           </motion.div>
         )}
 
+        {/* === STYLE === */}
         {step === "style" && (
-          <motion.div key="style" className="flex-1 flex flex-col items-center justify-center gap-12 px-6">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center flex flex-col items-center justify-center gap-12 px-6">
             <h2 className="text-4xl sm:text-5xl font-bold text-center">Стиль общения</h2>
             <div className="grid grid-cols-2 gap-6 w-full max-w-lg">
               {["нежная", "дерзкая", "покорная", "доминантная"].map(s => (
@@ -231,7 +249,6 @@ export default function NeonGlowAI() {
                       : "bg-gradient-to-r from-pink-700 to-purple-700"
                   }`}>
                     {m.type === "image" ? (
-                      // КРАСИВОЕ ФОТО НОРМАЛЬНОГО РАЗМЕРА
                       <img 
                         src={m.content} 
                         alt="18+" 
@@ -256,9 +273,9 @@ export default function NeonGlowAI() {
                   onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
                   placeholder="Напиши или нажми камеру..."
                   rows={1}
-                  className="flex-1 bg-white/10 rounded-2xl px-5 py-3.5 text-base outline-none resize-none max-h-32 placeholder-white/50"
+                  className="flex-1 bg-white/10 rounded-2xl px-5 py-3.5 text-base outline-none resize-none max-h-32 placeholder-white/50 scrollbar-hide"
                 />
-                <button onClick={() => setInput("сделай фото")} className="p-3.5 bg-pink-600 rounded-full shadow-lg">
+                <button onClick={() => setInput(prev => prev + " ❤️")} className="p-3.5 bg-pink-600 rounded-full shadow-lg">
                   <Heart className="w-6 h-6" />
                 </button>
                 <button onClick={sendMessage} disabled={loading} className="p-3.5 bg-purple-600 rounded-full shadow-lg">
