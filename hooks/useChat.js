@@ -1,14 +1,37 @@
-// hooks/useChat.js
+// hooks/useChat.js — ПОЛНЫЙ ИСПРАВЛЕННЫЙ КОД (декабрь 2025)
+
 import { useState, useEffect, useRef, useCallback } from "react";
 
 export default function useChat() {
   const [step, setStep] = useState("welcome");
+
   const [personality, setPersonality] = useState({
-    gender: null,
-    orientation: null,
+    userGender: null,      // Кто сам пользователь: "Парень" | "Девушка" | "Другое"
+    gender: null,          // Кого хочет: "Девушка" | "Парень"
+    orientation: null,     // Автоматически вычисляется ниже
     style: null,
     nsfw: true,
   });
+
+  // Автоматически определяем ориентацию при изменении userGender или gender
+  useEffect(() => {
+    if (!personality.userGender || !personality.gender) {
+      setPersonality(p => ({ ...p, orientation: null }));
+      return;
+    }
+
+    const user = personality.userGender;
+    const wants = personality.gender;
+
+    let orientation = "би"; // по умолчанию — если "Другое" или сложные комбинации
+
+    if (user === "Парень" && wants === "Девушка") orientation = "натурал";
+    if (user === "Парень" && wants === "Парень") orientation = "гей";
+    if (user === "Девушка" && wants === "Парень") orientation = "натурал";
+    if (user === "Девушка" && wants === "Девушка") orientation = "лесби";
+
+    setPersonality(p => ({ ...p, orientation }));
+  }, [personality.userGender, personality.gender]);
 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -18,10 +41,12 @@ export default function useChat() {
   const messagesEndRef = useRef(null);
   const audioRef = useRef(null);
 
+  // Автоскролл
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Telegram WebApp
   useEffect(() => {
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready();
@@ -29,6 +54,7 @@ export default function useChat() {
     }
   }, []);
 
+  // === TTS ===
   const speak = useCallback(async (text) => {
     if (!text?.trim()) return;
     try {
@@ -47,6 +73,7 @@ export default function useChat() {
     } catch (e) {}
   }, []);
 
+  // === Отправка сообщения ===
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
     const userMsg = input.trim();
@@ -109,6 +136,7 @@ export default function useChat() {
     }
   };
 
+  // === Генерация фото ===
   const generatePhoto = async () => {
     if (generatingPhoto || !input.trim()) return;
     setGeneratingPhoto(true);
@@ -133,27 +161,43 @@ export default function useChat() {
       setMessages(prev =>
         prev
           .filter(m => m.content !== "Генерирую горячее фото... (15–25 сек)")
-          .concat({ role: "assistant", content: "Не получилось… попробуй другой запрос" })
+          .concat({ role: "assistant", content: "Не получилось… попробуй другой запрос ❤️" })
       );
     } finally {
       setGeneratingPhoto(false);
     }
   };
 
+  // === Управление чатом ===
   const undoLastMessage = () => setMessages(prev => prev.slice(0, -2));
+
   const resetChat = () => {
     setMessages([]);
     setStep("welcome");
+    setPersonality({
+      userGender: null,
+      gender: null,
+      orientation: null,
+      style: null,
+      nsfw: true,
+    });
   };
 
   return {
-    step, setStep,
-    personality, setPersonality,
-    messages, setMessages,
-    input, setInput,
-    loading, generatingPhoto,
-    messagesEndRef, audioRef,
-    sendMessage, generatePhoto,
-    undoLastMessage, resetChat,
+    step,
+    setStep,
+    personality,
+    setPersonality,
+    messages,
+    input,
+    setInput,
+    loading,
+    generatingPhoto,
+    messagesEndRef,
+    audioRef,
+    sendMessage,
+    generatePhoto,
+    undoLastMessage,
+    resetChat,
   };
 }
