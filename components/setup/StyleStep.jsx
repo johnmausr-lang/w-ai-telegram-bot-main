@@ -1,21 +1,17 @@
-// components/setup/StyleStep.jsx — ФИНАЛЬНАЯ РАБОЧАЯ ВЕРСИЯ
-
+// components/setup/StyleStep.jsx — ИСПРАВЛЕНО: ТЕКСТ В КНОПКАХ НЕ ВЫЛЕЗАЕТ
 import { motion } from "framer-motion";
 
 export default function StyleStep({ personality, setPersonality, setStep, onComplete }) {
-  const styles = ["нежная", "дерзкая", "покорная", "доминантная"];
+  const styles = [
+    { value: "нежная", label: "Нежная" },
+    { value: "дерзкая", label: "Дерзкая" },
+    { value: "покорная", label: "Покорная" },
+    { value: "доминантная", label: "Доминантная" },
+  ];
 
-  const handleStyleSelect = (style) => {
-    // Сохраняем выбранный стиль
-    setPersonality((prev) => ({
-      ...prev,
-      style: style,
-    }));
-
-    // ← ГЛАВНОЕ: вызываем onComplete → в page.jsx сработает setStep("chat")
-    if (onComplete) {
-      onComplete();
-    }
+  const handleSelect = (style) => {
+    setPersonality(p => ({ ...p, style }));
+    onComplete();
   };
 
   return (
@@ -23,26 +19,23 @@ export default function StyleStep({ personality, setPersonality, setStep, onComp
       key="style"
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
+      exit={{ opacity: 0 }}
       className="text-center flex flex-col items-center justify-center gap-12 px-6 w-full max-w-md"
     >
-      <h2 className="text-4xl sm:text-5xl font-bold text-white">
-        Выбери стиль общения
+      <h2 className="text-4xl sm:text-5xl font-bold text-white leading-tight">
+        Выбери стиль<br />общения
       </h2>
 
-      <div className="grid grid-cols-2 gap-8 w-full">
-        {styles.map((s) => (
+      <div className="grid grid-cols-2 gap-6 w-full">
+        {styles.map(({ value, label }) => (
           <motion.button
-            key={s}
-            whileHover={{ scale: 1.1 }}
+            key={value}
+            whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => handleStyleSelect(s)}
-            className="px-10 py-8 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-2xl font-bold shadow-2xl hover:shadow-purple-500/50 transition-all capitalize"
+            onClick={() => handleSelect(value)}
+            className="px-8 py-6 rounded-3xl bg-gradient-to-br from-purple-600 to-pink-600 text-xl font-bold shadow-2xl hover:shadow-purple-500/50 transition-all"
           >
-            {s === "нежная" && "Нежная"}
-            {s === "дерзкая" && "Дерзкая"}
-            {s === "покорная" && "Покорная"}
-            {s === "доминантная" && "Доминантная"}
+            {label}
           </motion.button>
         ))}
       </div>
