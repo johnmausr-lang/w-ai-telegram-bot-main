@@ -1,51 +1,53 @@
-// hooks/useChat.js — ФИНАЛЬНАЯ ВЕРСИЯ С localStorage И СЕРДЕЧКАМИ
+// hooks/useChat.js — ФИНАЛЬНАЯ ВЕРСИЯ С ВСЕМИ ФИЧАМИ (2025)
 
 import { useState, useEffect, useRef, useCallback } from "react";
 
 const STORAGE_KEY = "neon-glow-ai-state";
 
 export default function useChat() {
-  // Загружаем из localStorage или создаём дефолт
-  const loadState = () => {
+  // Загружаем сохранённое состояние или создаём новое
+  const loadSavedState = () => {
     if (typeof window === "undefined") return null;
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
   };
 
-  const initialState = loadState() || {
-    step: "welcome",
-    personality: {
+  const saved = loadSavedState();
+
+  const [step, setStep] = useState(saved?.step || "welcome");
+  const [personality, setPersonality] = useState(
+    saved?.personality || {
       userGender: null,
       gender: null,
       orientation: null,
       style: null,
       nsfw: true,
-    },
-    messages: [],
-  };
-
-  const [step, setStep] = useState(initialState.step);
-  const [personality, setPersonality] = useState(initialState.personality);
-  const [messages, setMessages] = useState(initialState.messages);
+    }
+  );
+  const [messages, setMessages] = useState(saved?.messages || []);
 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [generatingPhoto, setGeneratingPhoto] = useState(false);
-  const [showHeart, setShowHeart] = useState(false); // ← для сердечка
+  const [showHeart, setShowHeart] = useState(false); // ← АНИМАЦИЯ СЕРДЕЧКА
 
   const messagesEndRef = useRef(null);
   const audioRef = useRef(null);
 
-  // Автосохранение при любом изменении
+  // Сохраняем в localStorage при любом изменении
   useEffect(() => {
-    const stateToSave = { step, personality, messages };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+    const toSave = { step, personality, messages };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   }, [step, personality, messages]);
 
   // Автоопределение ориентации
   useEffect(() => {
     if (!personality.userGender || !personality.gender) {
-      setPersonality(p => ({ ...p, orientation: null }));
+      setPersonality((p) => ({ ...p, orientation: null }));
       return;
     }
 
@@ -58,20 +60,22 @@ export default function useChat() {
     if (user === "Девушка" && wants === "Парень") orientation = "натурал";
     if (user === "Девушка" && wants === "Девушка") orientation = "лесби";
 
-    setPersonality(p => ({ ...p, orientation }));
+    setPersonality((p) => ({ ...p, orientation }));
   }, [personality.userGender, personality.gender]);
 
-  // При монтировании — если уже есть настройки → сразу в чат
+  // При первом запуске — если уже есть чат → сразу в него
   useEffect(() => {
-    if (initialState.step === "chat" && messages.length > 0) {
+    if (saved?.step === "chat" && saved.messages?.length > 0) {
       setStep("chat");
     }
   }, []);
 
+  // Автоскролл
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Telegram WebApp
   useEffect(() => {
     if (window.Telegram?.WebApp) {
       window.Telegram.WebApp.ready();
@@ -83,7 +87,11 @@ export default function useChat() {
   const speak = useCallback(async (text) => {
     if (!text?.trim()) return;
     try {
-      const res = await fetch("/api/tts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
       if (!res.ok) return;
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -94,19 +102,20 @@ export default function useChat() {
     } catch (e) {}
   }, []);
 
-  // Отправка с сердечком
+  // ОТПРАВКА С СЕРДЕЧКОМ
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
+
     const userMsg = input.trim();
     setInput("");
     setLoading(true);
 
-    // Сердечко летит!
+    // Сердечко взлетает!
     setShowHeart(true);
     setTimeout(() => setShowHeart(false), 1200);
 
-    setMessages(prev => [...prev, { role: "user", content: userMsg }]);
-    setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+    setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
     try {
       const res = await fetch("/api/chat", {
@@ -138,7 +147,7 @@ export default function useChat() {
             const data = JSON.parse(line.slice(6));
             const delta = data.choices?.[0]?.delta?.content || "";
             if (delta) {
-              setMessages(prev => {
+              setMessages((prev) => {
                 const arr = [...prev];
                 arr[arr.length - 1].content += delta;
                 return arr;
@@ -148,10 +157,11 @@ export default function useChat() {
         }
       }
 
+      // Озвучка ответа
       const reply = messages[messages.length - 1]?.content || "";
       if (reply) speak(reply);
     } catch (err) {
-      setMessages(prev => {
+      setMessages((prev) => {
         const arr = [...prev];
         arr[arr.length - 1].content = "Ой, что-то пошло не так… попробуй ещё раз";
         return arr;
@@ -161,9 +171,39 @@ export default function useChat() {
     }
   };
 
-  const generatePhoto = async () => { /* ... как было ... */ };
+  // Генерация фото (без изменений)
+  const generatePhoto = async () => {
+    if (generatingPhoto || !input.trim()) return;
+    setGeneratingPhoto(true);
 
-  const undoLastMessage = () => setMessages(prev => prev.slice(0, -2));
+    setMessages((prev) => [...prev, { role: "assistant", content: "Генерирую горячее фото... (15–25 сек)" }]);
+
+    try {
+      const res = await fetch("/api/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: input.trim() }),
+      });
+
+      const { imageUrl } = await res.json();
+
+      setMessages((prev) =>
+        prev
+          .filter((m) => m.content !== "Генерирую горячее фото... (15–25 сек)")
+          .concat({ role: "assistant", content: imageUrl, type: "image" })
+      );
+    } catch (e) {
+      setMessages((prev) =>
+        prev
+          .filter((m) => m.content !== "Генерирую горячее фото... (15–25 сек)")
+          .concat({ role: "assistant", content: "Не получилось… попробуй другой запрос" })
+      );
+    } finally {
+      setGeneratingPhoto(false);
+    }
+  };
+
+  const undoLastMessage = () => setMessages((prev) => prev.slice(0, -2));
 
   const resetChat = () => {
     setMessages([]);
@@ -179,14 +219,22 @@ export default function useChat() {
   };
 
   return {
-    step, setStep,
-    personality, setPersonality,
-    messages, setMessages,
-    input, setInput,
-    loading, generatingPhoto,
-    showHeart, // ← для анимации
-    messagesEndRef, audioRef,
-    sendMessage, generatePhoto,
-    undoLastMessage, resetChat,
+    step,
+    setStep,
+    personality,
+    setPersonality,
+    messages,
+    setMessages,
+    input,
+    setInput,
+    loading,
+    generatingPhoto,
+    showHeart, // ← ВОТ ОНО! Для анимации в ChatInputBar
+    messagesEndRef,
+    audioRef,
+    sendMessage,
+    generatePhoto,
+    undoLastMessage,
+    resetChat,
   };
 }
