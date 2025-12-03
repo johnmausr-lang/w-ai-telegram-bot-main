@@ -229,7 +229,7 @@ export default function useChat() {
     setInput,
     loading,
     generatingPhoto,
-    showHeart, // ← ВОТ ОНО! Для анимации в ChatInputBar
+    showHeart,
     messagesEndRef,
     audioRef,
     sendMessage,
