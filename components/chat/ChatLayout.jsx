@@ -19,15 +19,22 @@ export default function ChatLayout({
 
   return (
     <div className="flex flex-col h-screen">
-      {/* Сообщения */}
-      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-36 space-y-5">
+      {/* ВЕРХНЯЯ ПАНЕЛЬ — Назад + Новая беседа */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl border-b border-white/10">
+        <div className="flex justify-center gap-6 py-3">
+          <ChatControls undoLastMessage={undoLastMessage} resetChat={resetChat} />
+        </div>
+      </div>
+
+      {/* Сообщения — отступ сверху под панель */}
+      <div className="flex-1 overflow-y-auto px-4 pt-20 pb-36 space-y-5">
         {messages.map((m, i) => (
           <MessageBubble key={i} message={m} />
         ))}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Нижняя панель */}
+      {/* НИЖНЯЯ ПАНЕЛЬ — теперь чистая и красивая */}
       <div className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-white/10">
         <ChatInputBar
           input={input}
@@ -37,7 +44,6 @@ export default function ChatLayout({
           sendMessage={sendMessage}
           generatePhoto={generatePhoto}
         />
-        <ChatControls undoLastMessage={undoLastMessage} resetChat={resetChat} />
       </div>
     </div>
   );
