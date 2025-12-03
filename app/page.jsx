@@ -1,13 +1,13 @@
-// app/page.jsx — ФИНАЛЬНАЯ РАБОЧАЯ ВЕРСИЯ (ДЕКАБРЬ 2025)
+// app/page.jsx — ФИНАЛЬНАЯ ВЕРСИЯ С ЭКРАНОМ ЗАГРУЗКИ
 
 "use client";
 
-import { useEffect } from "react";
-import { AnimatePresence } from "framer-motion"; // ← ЭТОТ ИМПОРТ БЫЛ ПОТЕРЯН!
+import { AnimatePresence } from "framer-motion";
 import WelcomeScreen from "../components/WelcomeScreen";
 import UserGenderStep from "../components/setup/UserGenderStep";
 import GenderStep from "../components/setup/GenderStep";
 import StyleStep from "../components/setup/StyleStep";
+import LoadingScreen from "../components/LoadingScreen";
 import ChatLayout from "../components/chat/ChatLayout";
 import useChat from "../hooks/useChat";
 
@@ -29,19 +29,7 @@ export default function NeonGlowAI() {
     showHeart,
   } = useChat();
 
-  useEffect(() => {
-    console.log("NeonGlowAI: РЕНДЕР");
-    console.log("Текущий step:", step);
-    console.log("Personality:", personality);
-  }, [step, personality]);
-
-  const handleStyleComplete = () => {
-    console.log("StyleStep: onComplete вызван → переходим в чат");
-    setStep("chat");
-  };
-
   const goBack = () => {
-    console.log("Назад с шага:", step);
     if (step === "user-gender") setStep("welcome");
     else if (step === "gender") setStep("user-gender");
     else if (step === "style") setStep("gender");
@@ -62,24 +50,11 @@ export default function NeonGlowAI() {
 
       <div className="flex-1 flex items-center justify-center relative">
         <AnimatePresence mode="wait">
-          {step === "welcome" && (
-            <WelcomeScreen key="welcome" onStart={() => setStep("user-gender")} />
-          )}
-          {step === "user-gender" && (
-            <UserGenderStep key="user-gender" personality={personality} setPersonality={setPersonality} setStep={setStep} />
-          )}
-          {step === "gender" && (
-            <GenderStep key="gender" personality={personality} setPersonality={setPersonality} setStep={setStep} />
-          )}
-          {step === "style" && (
-            <StyleStep
-              key="style"
-              personality={personality}
-              setPersonality={setPersonality}
-              setStep={setStep}
-              onComplete={handleStyleComplete}
-            />
-          )}
+          {step === "welcome" && <WelcomeScreen key="welcome" onStart={() => setStep("user-gender")} />}
+          {step === "user-gender" && <UserGenderStep key="user-gender" personality={personality} setPersonality={setPersonality} setStep={setStep} />}
+          {step === "gender" && <GenderStep key="gender" personality={personality} setPersonality={setPersonality} setStep={setStep} />}
+          {step === "style" && <StyleStep key="style" personality={personality} setPersonality={setPersonality} setStep={setStep} />}
+          {step === "loading" && <LoadingScreen key="loading" />}
           {step === "chat" && (
             <ChatLayout
               key="chat"
