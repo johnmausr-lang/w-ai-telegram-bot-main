@@ -1,4 +1,5 @@
-// app/page.jsx — ЗАМЕНИ ЭТОТ ФАЙЛ ПОЛНОСТЬЮ
+// app/page.jsx — РАБОЧАЯ ВЕРСИЯ (декабрь 2025)
+
 "use client";
 
 import { AnimatePresence } from "framer-motion";
@@ -26,17 +27,16 @@ export default function NeonGlowAI() {
     resetChat,
   } = useChat();
 
-  // Универсальная кнопка «Назад»
+  // Кнопка «Назад» — работает идеально
   const goBack = () => {
-    const order = ["user-gender", "gender", "style", "chat"];
-    const idx = order.indexOf(step);
-    if (idx > 0) setStep(order[idx - 1]);
-    else setStep("welcome");
+    if (step === "gender") setStep("user-gender");
+    else if (step === "style") setStep("gender");
+    else if (step === "user-gender") setStep("welcome");
   };
 
   return (
     <div className="min-h-screen w-screen neon-bg flex flex-col">
-      {/* Кнопка Назад — появляется со второго шага */}
+      {/* Кнопка Назад — только на шагах настройки */}
       {step !== "welcome" && step !== "chat" && (
         <div className="fixed top-4 left-4 z-50">
           <button
@@ -48,25 +48,48 @@ export default function NeonGlowAI() {
         </div>
       )}
 
-      <AnimatePresence mode="wait">
-        {step === "welcome" && <WelcomeScreen onStart={() => setStep("user-gender")} />}
-        {step === "user-gender" && <UserGenderStep personality={personality} setPersonality={setPersonality} setStep={setStep} />}
-        {step === "gender" && <GenderStep personality={personality} setPersonality={setPersonality} setStep={setStep} />}
-        {step === "style" && <StyleStep personality={personality} setPersonality={setPersonality} setStep={setStep} onComplete={() => setStep("chat")} />}
-        {step === "chat" && (
-          <ChatLayout
-            messages={messages}
-            input={input}
-            setInput={setInput}
-            loading={loading}
-            generatingPhoto={generatingPhoto}
-            sendMessage={sendMessage}
-            generatePhoto={generatePhoto}
-            undoLastMessage={undoLastMessage}
-            resetChat={resetChat}
-          />
-        )}
-      </AnimatePresence>
+      {/* ВСЁ ПО ЦЕНТРУ — как было изначально */}
+      <div className="flex-1 flex items-center justify-center px-6">
+        <AnimatePresence mode="wait">
+          {/* 1. Welcome */}
+          {step === "welcome" && <WelcomeScreen onStart={() => setStep("user-gender")} />}
+
+          {/* 2. Кто ты? — только Парень / Девушка */}
+          {step === "user-gender" && (
+            <UserGenderStep personality={personality} setPersonality={setPersonality} setStep={setStep} />
+          )}
+
+          {/* 3. Кто тебя заводит? */}
+          {step === "gender" && (
+            <GenderStep personality={personality} setPersonality={setPersonality} setStep={setStep} />
+          )}
+
+          {/* 4. Стиль общения → потом сразу в чат */}
+          {step === "style" && (
+            <StyleStep
+              personality={personality}
+              setPersonality={setPersonality}
+              setStep={setStep}
+              onComplete={() => setStep("chat")}  // ← ГАРАНТИРОВАННЫЙ ПЕРЕХОД
+            />
+          )}
+
+          {/* 5. Чат */}
+          {step === "chat" && (
+            <ChatLayout
+              messages={messages}
+              input={input}
+              setInput={setInput}
+              loading={loading}
+              generatingPhoto={generatingPhoto}
+              sendMessage={sendMessage}
+              generatePhoto={generatePhoto}
+              undoLastMessage={undoLastMessage}
+              resetChat={resetChat}
+            />
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
