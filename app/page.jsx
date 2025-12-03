@@ -2,12 +2,12 @@
 "use client";
 
 import { AnimatePresence } from "framer-motion";
-import WelcomeScreen from "@/components/WelcomeScreen";
-import GenderStep from "@/components/setup/GenderStep";
-import OrientationStep from "@/components/setup/OrientationStep";
-import StyleStep from "@/components/setup/StyleStep";
-import ChatLayout from "@/components/chat/ChatLayout";
-import useChat from "@/hooks/useChat";
+import WelcomeScreen from "../components/WelcomeScreen";
+import GenderStep from "../components/setup/GenderStep";
+import OrientationStep from "../components/setup/OrientationStep";
+import StyleStep from "../components/setup/StyleStep";
+import ChatLayout from "../components/chat/ChatLayout";
+import useChat from "../hooks/useChat";
 
 export default function NeonGlowAI() {
   const {
