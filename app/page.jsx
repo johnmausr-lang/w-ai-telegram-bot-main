@@ -1,5 +1,8 @@
+// app/page.jsx — С МАКСИМАЛЬНЫМ ЛОГИРОВАНИЕМ (декабрь 2025)
+
 "use client";
 
+import { useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import WelcomeScreen from "../components/WelcomeScreen";
 import UserGenderStep from "../components/setup/UserGenderStep";
@@ -26,22 +29,32 @@ export default function NeonGlowAI() {
     showHeart,
   } = useChat();
 
-  // Переход в чат после выбора стиля
+  // ГЛОБАЛЬНОЕ ЛОГИРОВАНИЕ — ВСЁ, ЧТО ПРОИСХОДИТ
+  useEffect(() => {
+    console.log("NeonGlowAI: РЕНДЕР");
+    console.log("Текущий step:", step);
+    console.log("Personality:", personality);
+    console.log("Messages count:", messages.length);
+    console.log("Telegram WebApp:", !!window.Telegram?.WebApp);
+  }, [step, personality, messages]);
+
   const handleStyleComplete = () => {
-    console.log("Все настройки завершены → переходим в чат");
+    console.log("StyleStep: onComplete вызван → переходим в чат");
     setStep("chat");
   };
 
-  // Кнопка Назад
   const goBack = () => {
+    console.log("Кнопка Назад нажата, текущий step:", step);
     if (step === "user-gender") setStep("welcome");
     else if (step === "gender") setStep("user-gender");
     else if (step === "style") setStep("gender");
   };
 
+  console.log("Рендерим шаг:", step);
+
   return (
     <div className="min-h-screen w-screen neon-bg flex flex-col">
-      {/* Кнопка Назад */}
+      {/* Лог кнопки Назад */}
       {(step === "user-gender" || step === "gender" || step === "style") && (
         <div className="fixed top-4 left-4 z-50">
           <button
@@ -56,53 +69,80 @@ export default function NeonGlowAI() {
       <div className="flex-1 flex items-center justify-center relative">
         <AnimatePresence mode="wait">
           {step === "welcome" && (
-            <WelcomeScreen key="welcome" onStart={() => setStep("user-gender")} />
+            <div key="welcome">
+              {console.log("РЕНДЕРИМ: WelcomeScreen")}
+              <WelcomeScreen onStart={() => {
+                console.log("WelcomeScreen: Нажата кнопка Начать → user-gender");
+                setStep("user-gender");
+              }} />
+            </div>
           )}
 
           {step === "user-gender" && (
-            <UserGenderStep
-              key="user-gender"
-              personality={personality}
-              setPersonality={setPersonality}
-              setStep={setStep}
-            />
+            <div key="user-gender">
+              {console.log("РЕНДЕРИМ: UserGenderStep")}
+              <UserGenderStep
+                personality={personality}
+                setPersonality={setPersonality}
+                setStep={setStep}
+              />
+            </div>
           )}
 
           {step === "gender" && (
-            <GenderStep
-              key="gender"
-              personality={personality}
-              setPersonality={setPersonality}
-              setStep={setStep}
-            />
+            <div key="gender">
+              {console.log("РЕНДЕРИМ: GenderStep")}
+              <GenderStep
+                personality={personality}
+                setPersonality={setPersonality}
+                setStep={setStep}
+              />
+            </div>
           )}
 
           {step === "style" && (
-            <StyleStep
-              key="style"
-              personality={personality}
-              setPersonality={setPersonality}
-              setStep={setStep}
-              onComplete={handleStyleComplete}
-            />
+            <div key="style">
+              {console.log("РЕНДЕРИМ: StyleStep")}
+              <StyleStep
+                personality={personality}
+                setPersonality={setPersonality}
+                setStep={setStep}
+                onComplete={handleStyleComplete}
+              />
+            </div>
           )}
 
-          {/* ЧАТ — ВСЕ ПРОПСЫ ПЕРЕДАНЫ ПРАВИЛЬНО! */}
           {step === "chat" && (
-            <ChatLayout
-              key="chat"
-              messages={messages}
-              input={input}
-              setInput={setInput}
-              loading={loading}
-              generatingPhoto={generatingPhoto}
-              sendMessage={sendMessage}
-              generatePhoto={generatePhoto}
-              undoLastMessage={undoLastMessage}
-              resetChat={resetChat}
-              personality={personality}
-              showHeart={showHeart}
-            />
+            <div key="chat">
+              {console.log("РЕНДЕРИМ: ChatLayout — ЧАТ ДОЛЖЕН БЫТЬ ВИДЕН!")}
+              {console.log("Передаём в ChatLayout:", { messages: messages.length, personality, showHeart })}
+              <ChatLayout
+                messages={messages}
+                input={input}
+                setInput={setInput}
+                loading={loading}
+                generatingPhoto={generatingPhoto}
+                sendMessage={sendMessage}
+                generatePhoto={generatePhoto}
+                undoLastMessage={undoLastMessage}
+                resetChat={resetChat}
+                personality={personality}
+                showHeart={showHeart}
+              />
+            </div>
+          )}
+
+          {/* ЕСЛИ НИ ОДИН ШАГ НЕ СОВПАЛ — ПОКАЗЫВАЕМ ОШИБКУ */}
+          {![
+            "welcome",
+            "user-gender",
+            "gender",
+            "style",
+            "chat"
+          ].includes(step) && (
+            <div className="text-red-500 text-4xl">
+              ОШИБКА: неизвестный step = "{step}"
+            </div>
           )}
         </AnimatePresence>
       </div>
