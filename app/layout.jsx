@@ -1,5 +1,6 @@
-// Файл: layout.jsx
+// app/layout.jsx
 import "./globals.css";
+import { Sparkles } from "lucide-react";
 
 export const metadata = {
   title: "Neon Glow AI",
